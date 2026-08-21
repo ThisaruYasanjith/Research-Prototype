@@ -1,71 +1,48 @@
-# ui-prototype README
+## Project Structure
 
-This is the README for your extension "ui-prototype". After writing up a brief description, we recommend including the following sections.
+```text
+ui-prototype/
+├── .vscode/
+│   ├── launch.json                  # VS Code debug configurations
+│   ├── settings.json                # Project-specific editor settings
+│   └── tasks.json                   # Build and watch task definitions
+├── dist/                            # Compiled JS output (auto-generated)
+├── node_modules/                    # Project dependencies
+├── src/
+│   ├── extension.ts                 # Main extension entry point & command registration
+│   ├── dashboardView.ts             # Sidebar launcher buttons (TreeDataProvider)
+│   ├── architecture/
+│   │   └── architecturePanel.ts     # Member 1: Architectural analysis Webview
+│   ├── codeQuality/
+│   │   └── codeQualityPanel.ts      # Member 2: Code quality & smells Webview
+│   ├── behavioural/
+│   │   └── behaviouralPanel.ts      # Member 3: Behavioural & concurrency Webview
+│   └── runtime/
+│       └── runtimePanel.ts          # Member 4: Runtime error Webview
+├── .gitignore                       # Git ignore rules
+├── .vscodeignore                   # Files excluded from the packaged extension
+├── esbuild.js                       # esbuild bundler configuration script
+├── package.json                     # Extension manifest & command contributions
+├── tsconfig.json                    # TypeScript compiler options
+└── README.md                        # Documentation
 
-## Features
+## Prerequisites
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+## Ensure you have the following installed on your machine:
 
-For example if there is an image subfolder under your extension project workspace:
+    1. Node.js (version 18.x or higher)
+    2. npm (bundled with Node.js)
+    3. Visual Studio Code
 
-\!\[feature X\]\(images/feature-x.png\)
+## Installation & Setup
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+    Clone or open the repository folder in VS Code.
+    Install the necessary project dependencies by running: npm install
 
-## Requirements
+## Build and Run Instructions ## Build the extension
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+  npm run compile
 
-## Extension Settings
+## Launch the Extension Development Host
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+  code --extensionDevelopmentPath="$PWD"
