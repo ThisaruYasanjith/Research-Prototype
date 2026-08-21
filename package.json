@@ -26,27 +26,27 @@
     "views": {
       "code-analyzer-sidebar": [
         {
-          "id": "analyzer.architectureView",
-          "name": "1. Architectural Analysis"
-        },
-        {
-          "id": "analyzer.codeQualityView",
-          "name": "2. Code Quality"
-        },
-        {
-          "id": "analyzer.behaviouralView",
-          "name": "3. Behavioural Analysis"
-        },
-        {
-          "id": "analyzer.runtimeView",
-          "name": "4. Runtime Errors"
+          "id": "analyzer.dashboardView",
+          "name": "Analysis Modules"
         }
       ]
     },
     "commands": [
       {
-        "command": "analyzer.showIssue",
-        "title": "Show Issue Details"
+        "command": "analyzer.openArchitecture",
+        "title": "Open Architecture Analysis"
+      },
+      {
+        "command": "analyzer.openCodeQuality",
+        "title": "Open Code Quality"
+      },
+      {
+        "command": "analyzer.openBehavioural",
+        "title": "Open Behavioural Analysis"
+      },
+      {
+        "command": "analyzer.openRuntime",
+        "title": "Open Runtime Analysis"
       }
     ]
   },

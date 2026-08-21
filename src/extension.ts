@@ -1,21 +1,31 @@
-import * as vscode from 'vscode';
-import { ArchitectureProvider } from './architecture/architectureView';
-import { CodeQualityProvider } from './codeQuality/codeQualityView';
-import { BehaviouralProvider } from './behavioural/behaviouralView';
-import { RuntimeProvider } from './runtime/runtimeView';
+import * as vscode from "vscode";
+import { DashboardProvider } from "./dashboardView";
+import { ArchitecturePanel } from "./architecture/architecturePanel";
+import { CodeQualityPanel } from "./codeQuality/codeQualityPanel";
+import { BehaviouralPanel } from "./behavioural/behaviouralPanel";
+import { RuntimePanel } from "./runtime/runtimePanel";
 
 export function activate(context: vscode.ExtensionContext) {
-  // 1. Register Tree Views for all 4 modules
-  vscode.window.registerTreeDataProvider('analyzer.architectureView', new ArchitectureProvider());
-  vscode.window.registerTreeDataProvider('analyzer.codeQualityView', new CodeQualityProvider());
-  vscode.window.registerTreeDataProvider('analyzer.behaviouralView', new BehaviouralProvider());
-  vscode.window.registerTreeDataProvider('analyzer.runtimeView', new RuntimeProvider());
+  // Register sidebar buttons view
+  vscode.window.registerTreeDataProvider(
+    "analyzer.dashboardView",
+    new DashboardProvider(),
+  );
 
-  // 2. Global click action when an item is selected
+  // Register commands to open each full window panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('analyzer.showIssue', (category: string, title: string, detail: string) => {
-      vscode.window.showInformationMessage(`[${category}] ${title}: ${detail}`);
-    })
+    vscode.commands.registerCommand("analyzer.openArchitecture", () => {
+      ArchitecturePanel.show(context);
+    }),
+    vscode.commands.registerCommand("analyzer.openCodeQuality", () => {
+      CodeQualityPanel.show(context);
+    }),
+    vscode.commands.registerCommand("analyzer.openBehavioural", () => {
+      BehaviouralPanel.show(context);
+    }),
+    vscode.commands.registerCommand("analyzer.openRuntime", () => {
+      RuntimePanel.show(context);
+    }),
   );
 }
 
