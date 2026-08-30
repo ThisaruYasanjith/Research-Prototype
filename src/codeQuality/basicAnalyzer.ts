@@ -1,4 +1,5 @@
 import {
+  ClassAnalysis,
   DetectedIssue,
   JavaAnalysisResult,
   MethodAnalysis,
@@ -9,6 +10,9 @@ import { extractMethodMetrics } from "./methodMetrics";
 
 const LONG_METHOD_THRESHOLD = 40;
 const HIGH_COMPLEXITY_THRESHOLD = 10;
+
+const LARGE_CLASS_LENGTH_THRESHOLD = 200;
+const LARGE_CLASS_METHOD_COUNT_THRESHOLD = 15;
 
 /**
  * Coordinates the maintainability analysis of Java source code.
@@ -53,10 +57,44 @@ export function analyzeJavaSource(
     };
   });
 
-  const classes = extractClassMetrics(sourceCode, methodMetrics);
+  const classMetrics = extractClassMetrics(sourceCode, methodMetrics);
 
-  const totalIssues = methods.reduce(
+  const classes: ClassAnalysis[] = classMetrics.map((classItem) => {
+    const issues: DetectedIssue[] = [];
+
+    if (classItem.classLength > LARGE_CLASS_LENGTH_THRESHOLD) {
+      issues.push({
+        type: "Large Class",
+        actualValue: classItem.classLength,
+        threshold: LARGE_CLASS_LENGTH_THRESHOLD,
+        evidence:
+          `Class has ${classItem.classLength} lines ` +
+          `(threshold: ${LARGE_CLASS_LENGTH_THRESHOLD}).`,
+      });
+    } else if (classItem.methodCount > LARGE_CLASS_METHOD_COUNT_THRESHOLD) {
+      issues.push({
+        type: "Large Class",
+        actualValue: classItem.methodCount,
+        threshold: LARGE_CLASS_METHOD_COUNT_THRESHOLD,
+        evidence:
+          `Class has ${classItem.methodCount} methods ` +
+          `(threshold: ${LARGE_CLASS_METHOD_COUNT_THRESHOLD}).`,
+      });
+    }
+
+    return {
+      ...classItem,
+      issues,
+    };
+  });
+
+  const totalMethodIssues = methods.reduce(
     (total, method) => total + method.issues.length,
+    0,
+  );
+
+  const totalClassIssues = classes.reduce(
+    (total, classItem) => total + classItem.issues.length,
     0,
   );
 
@@ -64,6 +102,6 @@ export function analyzeJavaSource(
     fileName,
     methods,
     classes,
-    totalIssues,
+    totalIssues: totalMethodIssues + totalClassIssues,
   };
 }

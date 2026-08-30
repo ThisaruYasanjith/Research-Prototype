@@ -1,4 +1,7 @@
-export type MaintainabilityIssueType = "Long Method" | "High Complexity";
+export type MaintainabilityIssueType =
+  | "Long Method"
+  | "High Complexity"
+  | "Large Class";
 
 export interface DetectedIssue {
   type: MaintainabilityIssueType;
@@ -30,9 +33,13 @@ export interface ClassMetrics {
   fieldCount: number;
 }
 
+export interface ClassAnalysis extends ClassMetrics {
+  issues: DetectedIssue[];
+}
+
 export interface JavaAnalysisResult {
   fileName: string;
   methods: MethodAnalysis[];
-  classes: ClassMetrics[];
+  classes: ClassAnalysis[];
   totalIssues: number;
 }
