@@ -1,13 +1,14 @@
 export type MaintainabilityIssueType =
   | "Long Method"
   | "High Complexity"
-  | "Large Class";
+  | "Large Class"
+  | "Poor Naming";
 
 export interface DetectedIssue {
   type: MaintainabilityIssueType;
-  actualValue: number;
-  threshold: number;
   evidence: string;
+  actualValue?: number;
+  threshold?: number;
 }
 
 export interface MethodMetrics {

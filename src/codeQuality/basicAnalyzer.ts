@@ -8,6 +8,8 @@ import {
 import { extractClassMetrics } from "./classMetrics";
 import { extractMethodMetrics } from "./methodMetrics";
 
+import { analyzeClassName, analyzeMethodName } from "./namingAnalyzer";
+
 const LONG_METHOD_THRESHOLD = 40;
 const HIGH_COMPLEXITY_THRESHOLD = 10;
 
@@ -29,6 +31,7 @@ export function analyzeJavaSource(
   const methods: MethodAnalysis[] = methodMetrics.map((method) => {
     const issues: DetectedIssue[] = [];
 
+    // Long Method detection
     if (method.methodLength > LONG_METHOD_THRESHOLD) {
       issues.push({
         type: "Long Method",
@@ -40,6 +43,7 @@ export function analyzeJavaSource(
       });
     }
 
+    // High Complexity detection
     if (method.complexity > HIGH_COMPLEXITY_THRESHOLD) {
       issues.push({
         type: "High Complexity",
@@ -48,6 +52,18 @@ export function analyzeJavaSource(
         evidence:
           `Cyclomatic complexity is ${method.complexity} ` +
           `(threshold: ${HIGH_COMPLEXITY_THRESHOLD}).`,
+      });
+    }
+
+    // Poor Naming indicator - method level
+    const methodNamingIndicator = analyzeMethodName(method.methodName);
+
+    if (methodNamingIndicator) {
+      issues.push({
+        type: "Poor Naming",
+        evidence:
+          `Method "${methodNamingIndicator.identifier}": ` +
+          methodNamingIndicator.reason,
       });
     }
 
@@ -62,6 +78,7 @@ export function analyzeJavaSource(
   const classes: ClassAnalysis[] = classMetrics.map((classItem) => {
     const issues: DetectedIssue[] = [];
 
+    // Large Class detection
     if (classItem.classLength > LARGE_CLASS_LENGTH_THRESHOLD) {
       issues.push({
         type: "Large Class",
@@ -79,6 +96,18 @@ export function analyzeJavaSource(
         evidence:
           `Class has ${classItem.methodCount} methods ` +
           `(threshold: ${LARGE_CLASS_METHOD_COUNT_THRESHOLD}).`,
+      });
+    }
+
+    // Poor Naming indicator - class level
+    const classNamingIndicator = analyzeClassName(classItem.className);
+
+    if (classNamingIndicator) {
+      issues.push({
+        type: "Poor Naming",
+        evidence:
+          `Class "${classNamingIndicator.identifier}": ` +
+          classNamingIndicator.reason,
       });
     }
 
