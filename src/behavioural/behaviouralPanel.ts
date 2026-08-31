@@ -24,6 +24,7 @@ export class BehaviouralPanel {
   // Per-method baseline session state store keyed by method signature
   private static methodStates: Map<string, MethodState> = new Map();
   private static activeSignature: string | undefined;
+  private static autoAnalysisTimer: NodeJS.Timeout | undefined;
 
   public static show(context: vscode.ExtensionContext) {
     if (BehaviouralPanel.currentPanel) {
@@ -79,17 +80,57 @@ export class BehaviouralPanel {
       })
     );
 
-    // Track document changes to update active editor method code dynamically
+    // Track document changes to update active editor method code dynamically and trigger debounced auto-analysis
     context.subscriptions.push(
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
           BehaviouralPanel.refreshPanelFromEditor();
+          BehaviouralPanel.scheduleAutoAnalysis();
         }
       })
     );
 
     // Initial population
     BehaviouralPanel.refreshPanelFromEditor();
+  }
+
+  /**
+   * Schedule automatic analysis after developer edits code (750ms short pause debounce).
+   */
+  private static scheduleAutoAnalysis() {
+    if (BehaviouralPanel.autoAnalysisTimer) {
+      clearTimeout(BehaviouralPanel.autoAnalysisTimer);
+      BehaviouralPanel.autoAnalysisTimer = undefined;
+    }
+
+    BehaviouralPanel.autoAnalysisTimer = setTimeout(async () => {
+      await BehaviouralPanel.performAutoAnalysis();
+    }, 750);
+  }
+
+  /**
+   * Automatic analysis execution when developer edits code.
+   * Identifies the changed method and runs drift analysis if a baseline exists.
+   */
+  private static async performAutoAnalysis() {
+    if (!BehaviouralPanel.activeSignature) {
+      return;
+    }
+
+    const state = BehaviouralPanel.methodStates.get(BehaviouralPanel.activeSignature);
+    if (!state || !state.baselineFingerprint) {
+      return;
+    }
+
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const currentMethod = MethodDetector.detectCurrentMethod(editor);
+      if (currentMethod && currentMethod.signature === state.methodInfo.signature) {
+        state.methodInfo = currentMethod;
+      }
+    }
+
+    await BehaviouralPanel.runAnalysis(state, 'auto');
   }
 
   /**
@@ -156,7 +197,7 @@ export class BehaviouralPanel {
   }
 
   /**
-   * STEP 4 & 5: Analyze Again (Detect Drift, Impact, AI Explanation, Inline Diagnostics)
+   * STEP 4 & 5: Analyze Again (Manual Re-Analysis Option)
    */
   private static async handleAnalyzeAgain() {
     if (!BehaviouralPanel.activeSignature) {
@@ -168,7 +209,6 @@ export class BehaviouralPanel {
       return;
     }
 
-    // Check if the current method in editor has emailService.sendConfirmation or new effects
     const editor = vscode.window.activeTextEditor;
     if (editor) {
       const currentMethod = MethodDetector.detectCurrentMethod(editor);
@@ -177,12 +217,17 @@ export class BehaviouralPanel {
       }
     }
 
-    // Extract current fingerprint
+    await BehaviouralPanel.runAnalysis(state, 'manual');
+  }
+
+  /**
+   * Core Analysis Execution (shared by automatic edit detection and manual "Analyze Again" click)
+   */
+  private static async runAnalysis(state: MethodState, trigger: 'auto' | 'manual') {
     let current = BehaviouralAnalyzer.extractFingerprint(state.methodInfo);
 
-    // If for demo purposes the document wasn't manually edited yet, simulate the EXTERNAL_CALL addition
-    if (state.methodInfo.name === 'processOrder' && !current.effects.includes('EXTERNAL_CALL')) {
-      // Prompt demo fallback: treat processOrder as edited with EXTERNAL_CALL
+    // If for demo fallback processOrder wasn't edited with EXTERNAL_CALL yet and manual button clicked
+    if (state.methodInfo.name === 'processOrder' && !current.effects.includes('EXTERNAL_CALL') && trigger === 'manual') {
       current = {
         effects: ['DATABASE_WRITE', 'EXTERNAL_CALL'],
         linesMap: {
@@ -195,9 +240,11 @@ export class BehaviouralPanel {
     state.currentFingerprint = current;
 
     // STEP 5: Compare fingerprints & detect drift
-    const newEffects = BehaviouralAnalyzer.computeDrift(state.baselineFingerprint, current);
+    const newEffects = BehaviouralAnalyzer.computeDrift(state.baselineFingerprint!, current);
     state.newEffects = newEffects;
     state.step = 'DRIFT_ANALYZED';
+    state.lastAnalysisTrigger = trigger;
+    state.lastAnalyzedAt = new Date().toLocaleTimeString();
 
     // STEP 6: Rule-based Impact
     state.impactSeverity = BehaviouralAnalyzer.classifyImpact(newEffects);
@@ -662,6 +709,9 @@ export class BehaviouralPanel {
                   <button class="btn btn-secondary" onclick="postCmd('simulateEdit')">
                     <i class="codicon codicon-edit"></i> Add emailService Call to Method
                   </button>
+                  <div style="font-size: 11px; margin-top: 8px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px;">
+                    <i class="codicon codicon-zap" style="color: #cca700;"></i> Automatic detection active: editing code triggers analysis automatically after a short pause.
+                  </div>
                   `
                   : ''
               }
@@ -678,7 +728,10 @@ export class BehaviouralPanel {
             <div class="card">
               <div class="card-header">
                 <span class="card-title">Behavioural Comparison</span>
-                <span style="font-size: 11px; color: #89d185;">Signature: ✓ Unchanged</span>
+                <span class="tag ${state?.lastAnalysisTrigger === 'auto' ? 'tag-warning' : 'tag-neutral'}">
+                  <i class="codicon ${state?.lastAnalysisTrigger === 'auto' ? 'codicon-zap' : 'codicon-refresh'}"></i>
+                  ${state?.lastAnalysisTrigger === 'auto' ? 'Auto-Detected (Code Edit)' : 'Manual Analysis'}
+                </span>
               </div>
 
               <div style="font-size: 12px; margin-bottom: 6px;"><strong>Previous / Baseline:</strong></div>
@@ -749,8 +802,8 @@ export class BehaviouralPanel {
 
             <!-- RE-ANALYZER CONTROLS -->
             <div style="margin-top: 12px;">
-              <button class="btn btn-secondary" onclick="postCmd('analyzeAgain')">
-                <i class="codicon codicon-refresh"></i> Re-Analyze Current Method
+              <button class="btn" onclick="postCmd('analyzeAgain')">
+                <i class="codicon codicon-refresh"></i> Analyze Again
               </button>
               <button class="btn btn-secondary" style="margin-top: 6px;" onclick="postCmd('resetBaseline')">
                 <i class="codicon codicon-clear-all"></i> Reset Method Baseline

@@ -31,4 +31,6 @@ export interface MethodState {
   impactSeverity?: ImpactSeverity;
   llmExplanation?: string;
   suggestedAction?: string;
+  lastAnalysisTrigger?: 'auto' | 'manual';
+  lastAnalyzedAt?: string;
 }
