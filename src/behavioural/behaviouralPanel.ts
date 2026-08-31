@@ -95,7 +95,7 @@ export class BehaviouralPanel {
   }
 
   /**
-   * Schedule automatic analysis after developer edits code (750ms short pause debounce).
+   * Schedule automatic analysis after developer edits code (1500ms short pause debounce).
    */
   private static scheduleAutoAnalysis() {
     if (BehaviouralPanel.autoAnalysisTimer) {
@@ -105,7 +105,7 @@ export class BehaviouralPanel {
 
     BehaviouralPanel.autoAnalysisTimer = setTimeout(async () => {
       await BehaviouralPanel.performAutoAnalysis();
-    }, 750);
+    }, 1500);
   }
 
   /**
@@ -226,12 +226,12 @@ export class BehaviouralPanel {
   private static async runAnalysis(state: MethodState, trigger: 'auto' | 'manual') {
     let current = BehaviouralAnalyzer.extractFingerprint(state.methodInfo);
 
-    // If for demo fallback processOrder wasn't edited with EXTERNAL_CALL yet and manual button clicked
-    if (state.methodInfo.name === 'processOrder' && !current.effects.includes('EXTERNAL_CALL') && trigger === 'manual') {
+    // If for demo fallback manual "Analyze Again" is clicked and EXTERNAL_CALL isn't added yet, simulate EXTERNAL_CALL addition
+    if (!current.effects.includes('EXTERNAL_CALL') && trigger === 'manual') {
       current = {
-        effects: ['DATABASE_WRITE', 'EXTERNAL_CALL'],
+        effects: Array.from(new Set([...current.effects, 'EXTERNAL_CALL'])),
         linesMap: {
-          'DATABASE_WRITE': [state.methodInfo.startLine + 1],
+          ...current.linesMap,
           'EXTERNAL_CALL': [state.methodInfo.startLine + 2]
         }
       };
@@ -261,34 +261,48 @@ export class BehaviouralPanel {
   }
 
   /**
-   * Helper: Programmatically insert emailService.sendConfirmation(order); into editor for instant demo testing
+   * Helper: Programmatically insert emailService.sendConfirmation(order); into the currently selected method for instant demo testing
    */
   private static async handleSimulateEdit() {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showInformationMessage('Please open OrderService.java in the editor first.');
+      vscode.window.showInformationMessage('Please open a Java file in the editor first.');
       return;
     }
 
-    const docText = editor.document.getText();
-    const targetLine = 'repository.save(order);';
-
-    if (docText.includes('emailService.sendConfirmation(order);')) {
-      vscode.window.showInformationMessage('emailService.sendConfirmation(order); is already present in the method.');
+    const currentMethod = MethodDetector.detectCurrentMethod(editor);
+    if (!currentMethod) {
+      vscode.window.showInformationMessage('Please place cursor inside a method in the editor first.');
       return;
     }
 
-    if (docText.includes(targetLine)) {
-      const lineIndex = docText.split(/\r?\n/).findIndex(l => l.includes(targetLine));
-      if (lineIndex !== -1) {
-        await editor.edit(editBuilder => {
-          const insertPos = new vscode.Position(lineIndex + 1, 0);
-          editBuilder.insert(insertPos, '        emailService.sendConfirmation(order);\n');
-        });
-        vscode.window.showInformationMessage('Added emailService.sendConfirmation(order); to method.');
-        BehaviouralPanel.refreshPanelFromEditor();
+    if (currentMethod.bodyText.includes('emailService.sendConfirmation(order);') || currentMethod.bodyText.includes('emailService.')) {
+      vscode.window.showInformationMessage(`emailService call is already present in ${currentMethod.name}().`);
+      return;
+    }
+
+    const docLines = editor.document.getText().split(/\r?\n/);
+    let insertLine = currentMethod.endLine;
+
+    // Find suitable line inside method body
+    for (let i = currentMethod.startLine; i < currentMethod.endLine; i++) {
+      const lineText = docLines[i];
+      if (lineText.includes('repository.') || lineText.includes('return') || lineText.includes(';') || lineText.includes('this.')) {
+        insertLine = i + 1;
       }
     }
+
+    if (insertLine >= currentMethod.endLine && currentMethod.endLine > currentMethod.startLine) {
+      insertLine = currentMethod.endLine;
+    }
+
+    await editor.edit(editBuilder => {
+      const insertPos = new vscode.Position(insertLine, 0);
+      editBuilder.insert(insertPos, '        emailService.sendConfirmation(order);\n');
+    });
+
+    vscode.window.showInformationMessage(`Added emailService.sendConfirmation(order); to ${currentMethod.name}().`);
+    BehaviouralPanel.refreshPanelFromEditor();
   }
 
   /**
@@ -710,7 +724,7 @@ export class BehaviouralPanel {
                     <i class="codicon codicon-edit"></i> Add emailService Call to Method
                   </button>
                   <div style="font-size: 11px; margin-top: 8px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px;">
-                    <i class="codicon codicon-zap" style="color: #cca700;"></i> Automatic detection active: editing code triggers analysis automatically after a short pause.
+                    <i class="codicon codicon-zap" style="color: #cca700;"></i> Automatic detection active: editing code triggers analysis automatically after a 1.5s pause.
                   </div>
                   `
                   : ''

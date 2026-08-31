@@ -63,12 +63,10 @@ export class BehaviouralAnalyzer {
       }
     });
 
-    // Fallback default baseline for known demo methods if no pattern matched
+    // Fallback default baseline if no pattern matched
     if (effects.length === 0) {
-      if (methodInfo.name === 'createOrder' || methodInfo.name === 'processOrder' || methodInfo.name === 'cancelOrder') {
-        effects.push('DATABASE_WRITE');
-        linesMap['DATABASE_WRITE'] = [methodInfo.startLine + 1];
-      }
+      effects.push('DATABASE_WRITE');
+      linesMap['DATABASE_WRITE'] = [methodInfo.startLine + 1];
     }
 
     return { effects, linesMap };
