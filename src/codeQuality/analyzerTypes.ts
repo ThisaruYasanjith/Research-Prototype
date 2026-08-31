@@ -2,7 +2,8 @@ export type MaintainabilityIssueType =
   | "Long Method"
   | "High Complexity"
   | "Large Class"
-  | "Poor Naming";
+  | "Poor Naming"
+  | "Duplicated Logic";
 
 export interface DetectedIssue {
   type: MaintainabilityIssueType;
@@ -38,9 +39,25 @@ export interface ClassAnalysis extends ClassMetrics {
   issues: DetectedIssue[];
 }
 
+export interface DuplicateAnalysis {
+  firstMethod: string;
+  secondMethod: string;
+
+  firstStartLine: number;
+  secondStartLine: number;
+
+  similarity: number;
+  threshold: number;
+
+  evidence: string;
+}
+
 export interface JavaAnalysisResult {
   fileName: string;
   methods: MethodAnalysis[];
   classes: ClassAnalysis[];
+
+  duplicates: DuplicateAnalysis[];
+
   totalIssues: number;
 }
