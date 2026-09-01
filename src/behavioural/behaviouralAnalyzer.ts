@@ -22,44 +22,59 @@ export class BehaviouralAnalyzer {
   public static extractFingerprint(methodInfo: MethodInfo): Fingerprint {
     const effects: SideEffectType[] = [];
     const linesMap: Partial<Record<SideEffectType, number[]>> = {};
+    const detailsMap: Partial<Record<SideEffectType, { lineNum: number; snippet: string }[]>> = {};
 
     const lines = methodInfo.bodyText.split(/\r?\n/);
 
     lines.forEach((line, idx) => {
       const lineNum = methodInfo.startLine + idx;
+      const trimmed = line.trim();
+
+      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+        return;
+      }
+
+      // Check State Mutation pattern (e.g. order.setStatus("CREATED"), order.setStatus("CANCELLED"), this.field = ..., obj.setX(...))
+      const isSetterCall = /\b\w+\.set[A-Z]\w*\s*\(/.test(trimmed) || /\bset[A-Z]\w*\s*\(/.test(trimmed) || trimmed.includes('.setStatus(');
+      const isAssignment = (trimmed.includes('this.') || /\b\w+\s*=\s*[^=]/.test(trimmed)) &&
+        !trimmed.includes('public void') &&
+        !trimmed.includes('Order order') &&
+        !trimmed.includes('repository.') &&
+        !trimmed.includes('emailService.');
+
+      if (isSetterCall || isAssignment) {
+        if (!effects.includes('STATE_MUTATION')) {
+          effects.push('STATE_MUTATION');
+        }
+        linesMap['STATE_MUTATION'] = [...(linesMap['STATE_MUTATION'] || []), lineNum];
+        detailsMap['STATE_MUTATION'] = [...(detailsMap['STATE_MUTATION'] || []), { lineNum, snippet: trimmed }];
+      }
 
       // Check Database Write pattern
-      if (line.includes('repository.save') || line.includes('repository.delete') || line.includes('repository.update')) {
+      if (trimmed.includes('repository.save') || trimmed.includes('repository.delete') || trimmed.includes('repository.update') || trimmed.includes('.save(') || trimmed.includes('.delete(') || trimmed.includes('.update(')) {
         if (!effects.includes('DATABASE_WRITE')) {
           effects.push('DATABASE_WRITE');
         }
         linesMap['DATABASE_WRITE'] = [...(linesMap['DATABASE_WRITE'] || []), lineNum];
+        detailsMap['DATABASE_WRITE'] = [...(detailsMap['DATABASE_WRITE'] || []), { lineNum, snippet: trimmed }];
       }
 
       // Check External Service Call pattern
-      if (line.includes('emailService.') || line.includes('sendConfirmation') || line.includes('http') || line.includes('client.')) {
+      if (trimmed.includes('emailService.') || trimmed.includes('sendConfirmation') || trimmed.includes('http') || trimmed.includes('client.') || trimmed.includes('restTemplate.') || trimmed.includes('webClient.')) {
         if (!effects.includes('EXTERNAL_CALL')) {
           effects.push('EXTERNAL_CALL');
         }
         linesMap['EXTERNAL_CALL'] = [...(linesMap['EXTERNAL_CALL'] || []), lineNum];
+        detailsMap['EXTERNAL_CALL'] = [...(detailsMap['EXTERNAL_CALL'] || []), { lineNum, snippet: trimmed }];
       }
 
       // Check File I/O pattern
-      if (line.includes('FileWriter') || line.includes('FileReader') || line.includes('file.write')) {
+      if (trimmed.includes('FileWriter') || trimmed.includes('FileReader') || trimmed.includes('file.write') || trimmed.includes('Files.write')) {
         if (!effects.includes('FILE_IO')) {
           effects.push('FILE_IO');
         }
         linesMap['FILE_IO'] = [...(linesMap['FILE_IO'] || []), lineNum];
-      }
-
-      // Check State Mutation pattern
-      if (line.includes('this.') || line.match(/\b\w+\s*=\s*[^=]/)) {
-        if (!line.includes('Order order') && !line.includes('public void') && !line.includes('repository.') && !line.includes('emailService.')) {
-          if (!effects.includes('STATE_MUTATION')) {
-            effects.push('STATE_MUTATION');
-          }
-          linesMap['STATE_MUTATION'] = [...(linesMap['STATE_MUTATION'] || []), lineNum];
-        }
+        detailsMap['FILE_IO'] = [...(detailsMap['FILE_IO'] || []), { lineNum, snippet: trimmed }];
       }
     });
 
@@ -69,7 +84,7 @@ export class BehaviouralAnalyzer {
       linesMap['DATABASE_WRITE'] = [methodInfo.startLine + 1];
     }
 
-    return { effects, linesMap };
+    return { effects, linesMap, detailsMap };
   }
 
   /**

@@ -11,9 +11,15 @@ export interface MethodInfo {
   bodyText: string;
 }
 
+export interface SideEffectDetail {
+  lineNum: number;
+  snippet: string;
+}
+
 export interface Fingerprint {
   effects: SideEffectType[];
   linesMap: Partial<Record<SideEffectType, number[]>>; // 0-indexed line numbers where effects occur
+  detailsMap?: Partial<Record<SideEffectType, SideEffectDetail[]>>;
 }
 
 export type AnalysisStep =

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { MethodInfo, MethodState, AnalysisStep, SideEffectType } from './types';
+import { MethodInfo, MethodState, AnalysisStep, SideEffectType, ImpactSeverity } from './types';
 import { MethodDetector } from './methodDetector';
 import { BehaviouralAnalyzer } from './behaviouralAnalyzer';
 
@@ -20,6 +20,52 @@ export class BehaviouralPanel {
   private static currentPanel: vscode.WebviewPanel | undefined;
   private static diagnosticCollection: vscode.DiagnosticCollection =
     vscode.languages.createDiagnosticCollection('behaviouralDrift');
+
+  // Impact-specific editor decorations with warning gutter icons & colors
+  private static highImpactDecorationType: vscode.TextEditorDecorationType =
+    vscode.window.createTextEditorDecorationType({
+      backgroundColor: 'rgba(241, 76, 76, 0.22)',
+      border: '1px solid rgba(241, 76, 76, 0.6)',
+      borderRadius: '3px',
+      isWholeLine: true,
+      overviewRulerColor: '#f14c4c',
+      overviewRulerLane: vscode.OverviewRulerLane.Right,
+      gutterIconPath: vscode.Uri.parse('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%23f14c4c" d="M7.56 1.76a1 1 0 0 1 1.76 0l6.23 10.8a1 1 0 0 1-.88 1.44H1.33a1 1 0 0 1-.88-1.44l6.23-10.8zM8 5a.75.75 0 0 0-.75.75v3.5a.75.75 0 0 0 1.5 0v-3.5A.75.75 0 0 0 8 5zm0 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>'),
+      gutterIconSize: 'contain'
+    });
+
+  private static mediumImpactDecorationType: vscode.TextEditorDecorationType =
+    vscode.window.createTextEditorDecorationType({
+      backgroundColor: 'rgba(204, 167, 0, 0.22)',
+      border: '1px solid rgba(204, 167, 0, 0.6)',
+      borderRadius: '3px',
+      isWholeLine: true,
+      overviewRulerColor: '#cca700',
+      overviewRulerLane: vscode.OverviewRulerLane.Right,
+      gutterIconPath: vscode.Uri.parse('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%23cca700" d="M7.56 1.76a1 1 0 0 1 1.76 0l6.23 10.8a1 1 0 0 1-.88 1.44H1.33a1 1 0 0 1-.88-1.44l6.23-10.8zM8 5a.75.75 0 0 0-.75.75v3.5a.75.75 0 0 0 1.5 0v-3.5A.75.75 0 0 0 8 5zm0 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>'),
+      gutterIconSize: 'contain'
+    });
+
+  private static lowImpactDecorationType: vscode.TextEditorDecorationType =
+    vscode.window.createTextEditorDecorationType({
+      backgroundColor: 'rgba(55, 148, 255, 0.22)',
+      border: '1px solid rgba(55, 148, 255, 0.6)',
+      borderRadius: '3px',
+      isWholeLine: true,
+      overviewRulerColor: '#3794ff',
+      overviewRulerLane: vscode.OverviewRulerLane.Right,
+      gutterIconPath: vscode.Uri.parse('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill="%233794ff" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM6.75 8a.75.75 0 0 1 .75-.75h1a.75.75 0 0 1 .75.75v3.5h.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1 0-1.5h.5V8.5h-.5A.75.75 0 0 1 6.75 8z"/></svg>'),
+      gutterIconSize: 'contain'
+    });
+
+  private static getDecorationTypeForImpact(impact?: ImpactSeverity): vscode.TextEditorDecorationType {
+    if (impact === 'HIGH' || impact === 'CRITICAL') {
+      return BehaviouralPanel.highImpactDecorationType;
+    } else if (impact === 'MEDIUM') {
+      return BehaviouralPanel.mediumImpactDecorationType;
+    }
+    return BehaviouralPanel.lowImpactDecorationType;
+  }
 
   // Per-method baseline session state store keyed by method signature
   private static methodStates: Map<string, MethodState> = new Map();
@@ -233,6 +279,10 @@ export class BehaviouralPanel {
         linesMap: {
           ...current.linesMap,
           'EXTERNAL_CALL': [state.methodInfo.startLine + 2]
+        },
+        detailsMap: {
+          ...current.detailsMap,
+          'EXTERNAL_CALL': [{ lineNum: state.methodInfo.startLine + 2, snippet: 'emailService.sendConfirmation(order);' }]
         }
       };
     }
@@ -302,6 +352,18 @@ export class BehaviouralPanel {
     });
 
     vscode.window.showInformationMessage(`Added emailService.sendConfirmation(order); to ${currentMethod.name}().`);
+
+    // Immediately update method info & execute drift analysis so the inserted line lights up as a warning in VS Code without delay
+    const updatedMethod = MethodDetector.detectCurrentMethod(editor);
+    if (updatedMethod && BehaviouralPanel.activeSignature) {
+      const state = BehaviouralPanel.methodStates.get(BehaviouralPanel.activeSignature);
+      if (state && state.baselineFingerprint) {
+        state.methodInfo = updatedMethod;
+        await BehaviouralPanel.runAnalysis(state, 'auto');
+        return;
+      }
+    }
+
     BehaviouralPanel.refreshPanelFromEditor();
   }
 
@@ -329,7 +391,7 @@ export class BehaviouralPanel {
   }
 
   /**
-   * STEP 8: Apply Inline VS Code Diagnostics in Active Editor
+   * STEP 8: Apply Inline VS Code Diagnostics & Editor Line Decorations
    */
   private static applyInlineDiagnostics(state: MethodState) {
     BehaviouralPanel.clearDiagnostics();
@@ -341,45 +403,97 @@ export class BehaviouralPanel {
 
     const document = editor.document;
     const diagnostics: vscode.Diagnostic[] = [];
+    const decorationRanges: vscode.Range[] = [];
 
-    // Look for lines containing new side effect signatures
     const lines = document.getText().split(/\r?\n/);
     const startLine = state.methodInfo.startLine;
     const endLine = Math.min(state.methodInfo.endLine, lines.length - 1);
+    const currentFp = state.currentFingerprint;
 
-    for (let i = startLine; i <= endLine; i++) {
-      const lineText = lines[i];
-      if (lineText.includes('emailService') || lineText.includes('sendConfirmation') || lineText.includes('http')) {
-        const range = new vscode.Range(i, lineText.indexOf('emailService') !== -1 ? lineText.indexOf('emailService') : 0, i, lineText.length);
-        const diagnostic = new vscode.Diagnostic(
-          range,
-          '⚠ Behavioral Drift: New external interaction detected\nSeverity: High\nSide Effect: EXTERNAL_CALL',
-          vscode.DiagnosticSeverity.Warning
-        );
-        diagnostic.source = 'Behavioural Analyzer';
-        diagnostics.push(diagnostic);
+    state.newEffects.forEach(effect => {
+      const lineNums = currentFp?.linesMap?.[effect] || [];
+      const details = currentFp?.detailsMap?.[effect] || [];
+
+      if (lineNums.length > 0) {
+        lineNums.forEach(lineNum => {
+          if (lineNum >= 0 && lineNum < lines.length) {
+            const lineText = lines[lineNum];
+            const range = new vscode.Range(lineNum, 0, lineNum, lineText.length);
+            const detailObj = details.find(d => d.lineNum === lineNum);
+            const snippetText = detailObj ? ` [Snippet: ${detailObj.snippet}]` : '';
+
+            const diagnostic = new vscode.Diagnostic(
+              range,
+              `⚠ Behavioral Drift: New ${effect} detected${snippetText}\nSeverity: ${state.impactSeverity || 'HIGH'}\nMethod: ${state.methodInfo.signature}`,
+              vscode.DiagnosticSeverity.Warning
+            );
+            diagnostic.source = 'Behavioural Analyzer';
+            diagnostics.push(diagnostic);
+            decorationRanges.push(range);
+          }
+        });
       }
-    }
 
-    // Fallback if no exact string match in document line range (e.g. simulated demo)
-    if (diagnostics.length === 0 && state.newEffects.includes('EXTERNAL_CALL')) {
+      // If no line numbers found via map, scan method lines for keywords matching the new effect
+      if (diagnostics.length === 0) {
+        for (let i = startLine; i <= endLine; i++) {
+          const lineText = lines[i];
+          let isMatch = false;
+
+          if (effect === 'EXTERNAL_CALL' && (lineText.includes('emailService') || lineText.includes('sendConfirmation') || lineText.includes('http') || lineText.includes('client.'))) {
+            isMatch = true;
+          } else if (effect === 'STATE_MUTATION' && (lineText.includes('.setStatus') || lineText.includes('this.') || lineText.includes('set'))) {
+            isMatch = true;
+          } else if (effect === 'DATABASE_WRITE' && (lineText.includes('repository.') || lineText.includes('.save') || lineText.includes('.delete'))) {
+            isMatch = true;
+          } else if (effect === 'FILE_IO' && (lineText.includes('Writer') || lineText.includes('file.'))) {
+            isMatch = true;
+          }
+
+          if (isMatch) {
+            const range = new vscode.Range(i, 0, i, lineText.length);
+            const diagnostic = new vscode.Diagnostic(
+              range,
+              `⚠ Behavioral Drift: New ${effect} detected\nSeverity: ${state.impactSeverity || 'HIGH'}\nMethod: ${state.methodInfo.signature}`,
+              vscode.DiagnosticSeverity.Warning
+            );
+            diagnostic.source = 'Behavioural Analyzer';
+            diagnostics.push(diagnostic);
+            decorationRanges.push(range);
+          }
+        }
+      }
+    });
+
+    // Fallback if no specific line matched
+    if (diagnostics.length === 0 && state.newEffects.length > 0) {
       const targetLine = Math.min(startLine + 2, endLine);
       const lineText = lines[targetLine] || '';
       const range = new vscode.Range(targetLine, 0, targetLine, Math.max(lineText.length, 10));
       const diagnostic = new vscode.Diagnostic(
         range,
-        '⚠ Behavioral Drift: New external interaction detected\nSeverity: High\nSide Effect: EXTERNAL_CALL',
+        `⚠ Behavioral Drift: New ${state.newEffects.join(', ')} detected\nSeverity: ${state.impactSeverity || 'HIGH'}\nMethod: ${state.methodInfo.signature}`,
         vscode.DiagnosticSeverity.Warning
       );
       diagnostic.source = 'Behavioural Analyzer';
       diagnostics.push(diagnostic);
+      decorationRanges.push(range);
     }
 
     BehaviouralPanel.diagnosticCollection.set(document.uri, diagnostics);
+
+    const impactDecorationType = BehaviouralPanel.getDecorationTypeForImpact(state.impactSeverity);
+    editor.setDecorations(impactDecorationType, decorationRanges);
   }
 
   private static clearDiagnostics() {
     BehaviouralPanel.diagnosticCollection.clear();
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      editor.setDecorations(BehaviouralPanel.highImpactDecorationType, []);
+      editor.setDecorations(BehaviouralPanel.mediumImpactDecorationType, []);
+      editor.setDecorations(BehaviouralPanel.lowImpactDecorationType, []);
+    }
   }
 
   private static updateWebview() {
@@ -392,6 +506,80 @@ export class BehaviouralPanel {
       : undefined;
 
     BehaviouralPanel.currentPanel.webview.html = BehaviouralPanel.getHtmlContent(state);
+  }
+
+  /**
+   * Helper to render side effect items with distinct icons and line snippets.
+   */
+  private static renderEffectList(
+    effects: SideEffectType[],
+    detailsMap?: Partial<Record<SideEffectType, { lineNum: number; snippet: string }[]>>,
+    newEffects: SideEffectType[] = []
+  ): string {
+    if (!effects || effects.length === 0) {
+      return `<div style="font-size: 11px; color: var(--vscode-descriptionForeground); font-style: italic; padding: 4px 0;">No side effects detected</div>`;
+    }
+
+    return `
+      <ul class="effect-list">
+        ${effects
+          .map(eff => {
+            const iconInfo = BehaviouralPanel.getEffectIconInfo(eff);
+            const isNew = newEffects.includes(eff);
+            const snippets = detailsMap && detailsMap[eff] ? detailsMap[eff]! : [];
+
+            return `
+              <li class="effect-item ${isNew ? 'effect-added' : ''}" style="border-left: 4px solid ${iconInfo.color};">
+                <div class="effect-header-row">
+                  <i class="codicon ${iconInfo.icon}" style="color: ${iconInfo.color}; font-size: 15px;"></i>
+                  <span class="effect-name" style="color: ${iconInfo.color}; font-weight: 600;">${eff}</span>
+                  ${isNew ? '<span class="tag tag-added">+ NEW DRIFT</span>' : ''}
+                </div>
+                ${
+                  snippets.length > 0
+                    ? `
+                    <div class="snippet-list">
+                      ${snippets
+                        .map(
+                          s => `
+                          <div class="snippet-item">
+                            <code>${BehaviouralPanel.escapeHtml(s.snippet)}</code>
+                          </div>
+                        `
+                        )
+                        .join('')}
+                    </div>
+                    `
+                    : ''
+                }
+              </li>
+            `;
+          })
+          .join('')}
+      </ul>
+    `;
+  }
+
+  private static getEffectIconInfo(effect: SideEffectType): { icon: string; color: string } {
+    switch (effect) {
+      case 'STATE_MUTATION':
+        return { icon: 'codicon-symbol-property', color: '#ce9178' };
+      case 'EXTERNAL_CALL':
+        return { icon: 'codicon-cloud', color: '#38bdf8' };
+      case 'DATABASE_WRITE':
+        return { icon: 'codicon-database', color: '#499c54' };
+      case 'FILE_IO':
+        return { icon: 'codicon-file-code', color: '#c586c0' };
+    }
+  }
+
+  private static escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   /**
@@ -582,20 +770,53 @@ export class BehaviouralPanel {
           .effect-item {
             font-family: var(--vscode-editor-font-family, monospace);
             font-size: 12px;
-            padding: 4px 8px;
-            background-color: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.2));
+            padding: 8px 10px;
+            background-color: var(--vscode-textCodeBlock-background, rgba(0,0,0,0.25));
             border: 1px solid var(--border-color);
-            border-radius: 4px;
-            margin-bottom: 6px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .effect-header-row {
             display: flex;
             align-items: center;
             gap: 8px;
           }
 
           .effect-added {
-            border-color: #499c54;
             background-color: rgba(73, 156, 84, 0.15);
+            border-color: #499c54;
+          }
+
+          .snippet-list {
+            margin-top: 4px;
+            padding-left: 23px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+          }
+
+          .snippet-item code {
+            font-family: var(--vscode-editor-font-family, monospace);
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: var(--vscode-editor-foreground, #d4d4d4);
+            word-break: break-all;
+          }
+
+          .tag-added {
+            background-color: rgba(73, 156, 84, 0.25);
             color: #89d185;
+            border: 1px solid #499c54;
+            margin-left: auto;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 3px;
           }
 
           .alert-box {
@@ -677,7 +898,14 @@ export class BehaviouralPanel {
             methodInfo
               ? `
               <div class="method-name">${methodInfo.declaration}</div>
-              <div class="method-sig">Signature: ${methodSig}</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px; flex-wrap: wrap; gap: 6px;">
+                <div class="method-sig">Signature: ${methodSig}</div>
+                ${
+                  step === 'BASELINE_CREATED' || step === 'DRIFT_ANALYZED'
+                    ? `<span class="tag tag-success" style="font-size: 11px;"><i class="codicon codicon-check"></i> Signature: Unchanged</span>`
+                    : ''
+                }
+              </div>
               `
               : `
               <div class="method-name" style="color: var(--vscode-descriptionForeground); font-weight: normal; font-style: italic;">No method selected</div>
@@ -699,36 +927,27 @@ export class BehaviouralPanel {
 
         <!-- INITIAL FINGERPRINT / BASELINE CREATED -->
         ${
-          step === 'BASELINE_CREATED' || step === 'DRIFT_ANALYZED'
+          step === 'BASELINE_CREATED'
             ? `
             <div class="card">
               <div class="card-header">
                 <span class="card-title">Behavioural Fingerprint</span>
                 <span style="font-size: 11px; color: #89d185;">✓ Baseline Created</span>
               </div>
-              <ul class="effect-list">
-                ${
-                  (state?.baselineFingerprint?.effects || ['DATABASE_WRITE'])
-                    .map(eff => `<li class="effect-item"><i class="codicon codicon-database"></i> • ${eff}</li>`)
-                    .join('')
-                }
-              </ul>
+              ${BehaviouralPanel.renderEffectList(
+                state?.baselineFingerprint?.effects || ['DATABASE_WRITE'],
+                state?.baselineFingerprint?.detailsMap
+              )}
 
-              ${
-                step === 'BASELINE_CREATED'
-                  ? `
-                  <button class="btn" onclick="postCmd('analyzeAgain')">
-                    <i class="codicon codicon-refresh"></i> Analyze Again
-                  </button>
-                  <button class="btn btn-secondary" onclick="postCmd('simulateEdit')">
-                    <i class="codicon codicon-edit"></i> Add emailService Call to Method
-                  </button>
-                  <div style="font-size: 11px; margin-top: 8px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px;">
-                    <i class="codicon codicon-zap" style="color: #cca700;"></i> Automatic detection active: editing code triggers analysis automatically after a 1.5s pause.
-                  </div>
-                  `
-                  : ''
-              }
+              <button class="btn" onclick="postCmd('analyzeAgain')">
+                <i class="codicon codicon-refresh"></i> Analyze Again
+              </button>
+              <button class="btn btn-secondary" onclick="postCmd('simulateEdit')">
+                <i class="codicon codicon-edit"></i> Add emailService Call to Method
+              </button>
+              <div style="font-size: 11px; margin-top: 8px; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 6px;">
+                <i class="codicon codicon-zap" style="color: #cca700;"></i> Automatic detection active: editing code triggers analysis automatically after a 1.5s pause.
+              </div>
             </div>
             `
             : ''
@@ -749,32 +968,28 @@ export class BehaviouralPanel {
               </div>
 
               <div style="font-size: 12px; margin-bottom: 6px;"><strong>Previous / Baseline:</strong></div>
-              <ul class="effect-list" style="margin-bottom: 10px;">
-                ${
-                  (state?.baselineFingerprint?.effects || ['DATABASE_WRITE'])
-                    .map(eff => `<li class="effect-item"><i class="codicon codicon-database"></i> • ${eff}</li>`)
-                    .join('')
-                }
-              </ul>
+              ${BehaviouralPanel.renderEffectList(
+                state?.baselineFingerprint?.effects || [],
+                state?.baselineFingerprint?.detailsMap
+              )}
 
-              <div style="font-size: 12px; margin-bottom: 6px;"><strong>Current:</strong></div>
-              <ul class="effect-list">
-                ${
-                  (state?.currentFingerprint?.effects || ['DATABASE_WRITE', 'EXTERNAL_CALL'])
-                    .map(eff => `
-                      <li class="effect-item ${eff === 'EXTERNAL_CALL' ? 'effect-added' : ''}">
-                        <i class="codicon ${eff === 'EXTERNAL_CALL' ? 'codicon-cloud' : 'codicon-database'}"></i>
-                        • ${eff}
-                      </li>
-                    `)
-                    .join('')
-                }
-              </ul>
+              <div style="font-size: 12px; margin-top: 10px; margin-bottom: 6px;"><strong>Current:</strong></div>
+              ${BehaviouralPanel.renderEffectList(
+                state?.currentFingerprint?.effects || [],
+                state?.currentFingerprint?.detailsMap,
+                state?.newEffects || []
+              )}
 
-              <div style="margin-top: 10px; font-size: 12px;">
-                <strong>New Behavioral Effect:</strong>
-                <span style="color: #89d185; font-family: monospace; font-weight: bold;">+ EXTERNAL_CALL</span>
-              </div>
+              ${
+                state?.newEffects && state.newEffects.length > 0
+                  ? `
+                  <div style="margin-top: 10px; font-size: 12px;">
+                    <strong>New Behavioral Effect:</strong>
+                    <span style="color: #89d185; font-family: monospace; font-weight: bold;">+ ${state.newEffects.join(', ')}</span>
+                  </div>
+                  `
+                  : ''
+              }
 
               <div class="alert-box">
                 <strong>⚠ BEHAVIOURAL DRIFT DETECTED</strong><br/>
@@ -786,11 +1001,11 @@ export class BehaviouralPanel {
             <div class="card">
               <div class="card-header">
                 <span class="card-title">Behavioural Impact</span>
-                <span class="tag tag-high">IMPACT: ${state?.impactSeverity || 'HIGH'}</span>
+                <span class="tag ${state?.impactSeverity === 'HIGH' || state?.impactSeverity === 'CRITICAL' ? 'tag-high' : 'tag-warning'}">IMPACT: ${state?.impactSeverity || 'HIGH'}</span>
               </div>
               <div style="font-size: 12px;">
-                <div><strong>New Side Effect:</strong> EXTERNAL_CALL</div>
-                <div><strong>Impact Rating:</strong> HIGH</div>
+                <div><strong>New Side Effect:</strong> ${state?.newEffects?.join(', ') || 'N/A'}</div>
+                <div><strong>Impact Rating:</strong> ${state?.impactSeverity || 'HIGH'}</div>
               </div>
             </div>
 
