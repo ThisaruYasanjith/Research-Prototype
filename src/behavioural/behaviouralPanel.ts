@@ -299,10 +299,10 @@ export class BehaviouralPanel {
     // STEP 6: Rule-based Impact
     state.impactSeverity = BehaviouralAnalyzer.classifyImpact(newEffects);
 
-    // STEP 7: LLM Explanation
-    const aiResult = BehaviouralAnalyzer.getAIExplanation(newEffects);
-    state.llmExplanation = aiResult.explanation;
-    state.suggestedAction = aiResult.action;
+    // STEP 7: Explanation
+    const explainResult = BehaviouralAnalyzer.getExplanation(newEffects);
+    state.llmExplanation = explainResult.explanation;
+    state.suggestedAction = explainResult.action;
 
     // STEP 8: Inline VS Code Diagnostics
     BehaviouralPanel.applyInlineDiagnostics(state);
@@ -1009,23 +1009,23 @@ export class BehaviouralPanel {
               </div>
             </div>
 
-            <!-- AI EXPLANATION -->
+            <!-- EXPLANATION -->
             <div class="ai-box">
               <div class="ai-header">
-                <i class="codicon codicon-sparkle"></i> AI Explanation
+                <i class="codicon codicon-info"></i> Explanation
               </div>
-              <div style="font-size: 12px; line-height: 1.6;">
-                ${state?.llmExplanation || 'The method previously performed only a database operation. The updated version also communicates with an external service. This introduces a new external dependency that may fail independently of the database operation.'}
+              <div style="font-size: 12px; line-height: 1.7; color: var(--vscode-editor-foreground);">
+                ${state?.llmExplanation || ''}
               </div>
             </div>
 
             <!-- SUGGESTED ACTION -->
             <div class="action-box">
               <div class="action-header">
-                <i class="codicon codicon-lightbulb"></i> Suggested Action
+                <i class="codicon codicon-lightbulb"></i> Suggested Actions
               </div>
-              <div style="font-size: 12px; line-height: 1.6;">
-                ${state?.suggestedAction || 'Consider adding appropriate error and timeout handling for the external service call.'}
+              <div style="font-size: 12px; line-height: 1.8; white-space: pre-line; color: var(--vscode-editor-foreground);">
+                ${state?.suggestedAction || ''}
               </div>
             </div>
 

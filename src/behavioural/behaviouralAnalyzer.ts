@@ -119,45 +119,74 @@ export class BehaviouralAnalyzer {
   }
 
   /**
-   * LLM-style plain-English explanation generation.
+   * Plain-English explanation generation for detected side-effect drift.
    * 
    * PROTOTYPE HARD-CODED LOGIC:
-   * Returns exact prompt-requested explanation for EXTERNAL_CALL drift.
+   * Returns structured explanations per effect type.
    * 
    * FUTURE EXPANSION: Replace with real LLM API call (e.g. Gemini 1.5 Pro / GPT-4o API)
    * passing full method diff context, AST summary, and prompt templates.
    */
-  public static getAIExplanation(newEffects: SideEffectType[]): { explanation: string; action: string } {
+  public static getExplanation(newEffects: SideEffectType[]): { explanation: string; action: string } {
     if (newEffects.includes('EXTERNAL_CALL')) {
       return {
         explanation:
-          'The method previously performed only a database operation. The updated version also communicates with an external service. This introduces a new external dependency that may fail independently of the database operation.',
+          'This method now communicates with an external service (e.g. emailService.sendConfirmation) in addition to its original database operation. ' +
+          'External service calls introduce a new failure point: the service may be temporarily unavailable, respond slowly, or return unexpected errors. ' +
+          'Unlike a database write, external calls are not automatically rolled back if a subsequent step fails, which can lead to partial execution and data inconsistency.',
         action:
-          'Consider adding appropriate error and timeout handling for the external service call.'
+          '1. Wrap the external call in a try-catch block to handle service errors gracefully.\n' +
+          '2. Set a timeout limit (e.g. 3–5 seconds) to prevent the method from hanging indefinitely.\n' +
+          '3. Consider adding a retry mechanism with exponential backoff for transient failures.\n' +
+          '4. If data consistency is critical, use a transactional outbox pattern or compensating transaction.'
       };
     }
 
     if (newEffects.includes('FILE_IO')) {
       return {
         explanation:
-          'The method introduced file system read/write operations. Disk I/O operations can introduce performance latency or unhandled file locks.',
+          'This method has introduced file system read or write operations. File I/O is significantly slower than in-memory operations and introduces risks such as: ' +
+          'disk full errors, permission denied exceptions, file locks held by other processes, and data corruption if the write is interrupted. ' +
+          'File operations that are not properly closed can also cause resource leaks over time.',
         action:
-          'Wrap file operations in try-with-resources and handle IOException explicitly.'
+          '1. Always use try-with-resources (e.g. try (FileWriter fw = new FileWriter(...))) to ensure the file handle is closed automatically.\n' +
+          '2. Explicitly catch IOException and log or rethrow it with a meaningful error message.\n' +
+          '3. Validate that the target directory exists and is writable before attempting the write.\n' +
+          '4. Avoid performing file I/O inside a database transaction — complete the transaction first.'
       };
     }
 
     if (newEffects.includes('STATE_MUTATION')) {
       return {
         explanation:
-          'The method introduced internal class state modifications. Mutating shared instance fields can create race conditions in multi-threaded runtime environments.',
+          'This method now modifies the internal state of an object (e.g. order.setStatus(...)) before or during its operation. ' +
+          'State mutations are a common source of bugs when the same object is shared across multiple threads or reused across multiple calls. ' +
+          'If the method is called concurrently, two threads may read and write the same field simultaneously, causing race conditions and unpredictable behaviour.',
         action:
-          'Ensure synchronized access or use thread-safe data structures for instance fields.'
+          '1. Ensure that the object being mutated (e.g. Order) is not shared across concurrent threads without synchronization.\n' +
+          '2. If thread safety is required, use synchronized blocks or java.util.concurrent locks around the mutation.\n' +
+          '3. Consider using immutable value objects and returning a new modified instance rather than mutating in place.\n' +
+          '4. Review all callers of this method to confirm that state changes happen in the correct sequence.'
+      };
+    }
+
+    if (newEffects.includes('DATABASE_WRITE')) {
+      return {
+        explanation:
+          'This method now performs a database write operation (save or delete) that was not present in the baseline. ' +
+          'Additional writes increase the risk of unintended data modifications, duplicate records, or conflicts with concurrent transactions. ' +
+          'They may also affect performance if called in loops or bulk operations.',
+        action:
+          '1. Confirm the write operation is intentional and not a duplicate of an existing call.\n' +
+          '2. Ensure the operation is protected within an appropriate transaction boundary (@Transactional).\n' +
+          '3. Add input validation before writing to prevent persisting invalid or incomplete data.\n' +
+          '4. Review the impact on existing unit and integration tests.'
       };
     }
 
     return {
-      explanation: 'No unexpected behavioural drift detected.',
-      action: 'No corrective action required.'
+      explanation: 'No unexpected behavioural drift was detected between the baseline and the current version of this method.',
+      action: 'No corrective action is required at this time. Continue monitoring for future changes.'
     };
   }
 }
