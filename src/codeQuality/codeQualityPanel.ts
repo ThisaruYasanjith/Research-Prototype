@@ -57,7 +57,6 @@ export class CodeQualityPanel {
 
         try {
           const sourceCode = document.getText();
-
           const fileName = path.basename(document.fileName);
 
           const result = analyzeJavaSource(sourceCode, fileName);
@@ -87,6 +86,7 @@ export class CodeQualityPanel {
     return `
       <!DOCTYPE html>
       <html lang="en">
+
       <head>
         <meta charset="UTF-8">
 
@@ -227,7 +227,9 @@ export class CodeQualityPanel {
 
           .issue-selectable {
             cursor: pointer;
-            transition: border-color 0.15s ease, background-color 0.15s ease;
+            transition:
+              border-color 0.15s ease,
+              background-color 0.15s ease;
           }
 
           .issue-selectable:hover {
@@ -247,9 +249,16 @@ export class CodeQualityPanel {
             margin-bottom: 8px;
           }
 
+          .rank-label {
+            color: var(--vscode-descriptionForeground);
+            font-size: 10px;
+            margin-bottom: 4px;
+          }
+
           .issue-location {
             font-family: var(--vscode-editor-font-family, monospace);
             font-weight: 600;
+            word-break: break-word;
           }
 
           .priority {
@@ -322,6 +331,17 @@ export class CodeQualityPanel {
             color: var(--vscode-descriptionForeground);
             font-family: var(--vscode-editor-font-family, monospace);
             margin-bottom: 15px;
+            word-break: break-word;
+          }
+
+          .details-meta {
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            color: var(--vscode-descriptionForeground);
+            font-size: 10px;
+            line-height: 1.6;
           }
 
           .sub-heading {
@@ -347,12 +367,30 @@ export class CodeQualityPanel {
           .evidence-values {
             color: var(--vscode-descriptionForeground);
             font-size: 11px;
+            line-height: 1.45;
+          }
+
+          .grouping-box {
+            padding: 8px 10px;
+            border-left: 2px solid var(--vscode-focusBorder);
+            background: var(--vscode-textBlockQuote-background);
+            color: var(--vscode-descriptionForeground);
+            font-size: 11px;
+            line-height: 1.5;
           }
 
           .explanation {
             font-size: 12px;
             line-height: 1.5;
             color: var(--vscode-descriptionForeground);
+          }
+
+          .priority-reason {
+            padding: 4px 0;
+          }
+
+          .priority-reason::before {
+            content: "• ";
           }
 
           .fix-step {
@@ -368,6 +406,7 @@ export class CodeQualityPanel {
 
           .step-number {
             min-width: 24px;
+            width: 24px;
             height: 24px;
             border-radius: 50%;
             background: var(--vscode-badge-background);
@@ -391,40 +430,26 @@ export class CodeQualityPanel {
             line-height: 1.4;
           }
 
-          .real-results {
-            display: none;
-            margin-top: 16px;
+          .step-related {
+            color: var(--vscode-descriptionForeground);
+            font-size: 10px;
+            margin-top: 4px;
           }
 
-          .real-results.visible {
-            display: block;
-          }
-
-          .real-result-card {
+          .empty-state {
+            padding: 16px;
             border: 1px solid var(--vscode-panel-border);
             border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 10px;
             background: var(--vscode-editorWidget-background);
-          }
-
-          .real-result-title {
-            font-weight: 600;
-            margin-bottom: 8px;
-          }
-
-          .real-result-line {
             color: var(--vscode-descriptionForeground);
+            text-align: center;
             font-size: 11px;
-            line-height: 1.6;
           }
 
-          .real-issue {
-            margin-top: 6px;
-            padding: 5px 7px;
-            border-left: 2px solid var(--vscode-editorWarning-foreground);
-            background: var(--vscode-textBlockQuote-background);
-            font-size: 11px;
+          @media (max-width: 600px) {
+            .summary-grid {
+              grid-template-columns: 1fr;
+            }
           }
         </style>
       </head>
@@ -447,55 +472,79 @@ export class CodeQualityPanel {
                 Analysis Target
               </div>
 
-              <div class="target-file" id="targetFile">
+              <div
+                class="target-file"
+                id="targetFile"
+              >
                 Open a Java file to analyze
               </div>
             </div>
 
-            <button class="analyze-button" id="analyzeButton">
+            <button
+              class="analyze-button"
+              id="analyzeButton"
+            >
               Analyze Current File
             </button>
 
           </div>
         </div>
 
-        <div class="analysis-status" id="analysisStatus"></div>
+        <div
+          class="analysis-status"
+          id="analysisStatus"
+        ></div>
 
-        <div class="real-results" id="realResults">
-
-          <div class="section-title">
-            Real Analyzer Output
-          </div>
-
-          <div id="realSummary"></div>
-
-          <div id="realGroups"></div>
-
-          <div id="realMethods"></div>
-
-          <div id="realClasses"></div>
-
-          <div id="realDuplicates"></div>
-
-        </div>
-
-        <div class="analysis-results" id="analysisResults">
+        <div
+          class="analysis-results"
+          id="analysisResults"
+        >
 
           <div class="summary-grid">
 
             <div class="summary-card">
-              <div class="summary-number">3</div>
-              <div class="summary-label">Issue Groups</div>
+
+              <div
+                class="summary-number"
+                id="groupCount"
+              >
+                0
+              </div>
+
+              <div class="summary-label">
+                Issue Groups
+              </div>
+
             </div>
 
             <div class="summary-card">
-              <div class="summary-number">1</div>
-              <div class="summary-label">High Priority</div>
+
+              <div
+                class="summary-number"
+                id="highPriorityCount"
+              >
+                0
+              </div>
+
+              <div class="summary-label">
+                High Priority
+              </div>
+
             </div>
 
             <div class="summary-card">
-              <div class="summary-number">6</div>
-              <div class="summary-label">Detected Issues</div>
+
+              <div
+                class="summary-number"
+                id="issueCount"
+              >
+                0
+              </div>
+
+              <div class="summary-label">
+                Detected Issues
+              </div>
+
             </div>
 
           </div>
@@ -504,96 +553,36 @@ export class CodeQualityPanel {
             Ranked Maintainability Issues
           </div>
 
-          <div
-            class="issue-card issue-selectable active"
-            data-group="processApplication"
-          >
-
-            <div class="issue-header">
-              <div class="issue-location">
-                processApplication()
-              </div>
-
-              <div class="priority priority-high">
-                HIGH
-              </div>
-            </div>
-
-            <div class="issue-tags">
-              <span class="issue-tag">Long Method</span>
-              <span class="issue-tag">High Complexity</span>
-              <span class="issue-tag">Duplicated Logic</span>
-            </div>
-
-            <div class="score-row">
-              <span>Maintainability Priority</span>
-              <span class="score">86 / 100</span>
-            </div>
-
-          </div>
+          <div id="rankedGroups"></div>
 
           <div
-            class="issue-card issue-selectable"
-            data-group="userService"
+            class="details-card"
+            id="detailsCard"
           >
 
-            <div class="issue-header">
-              <div class="issue-location">
-                UserService
-              </div>
+            <div
+              class="details-title"
+              id="detailTitle"
+            ></div>
 
-              <div class="priority priority-medium">
-                MEDIUM
-              </div>
+            <div
+              class="details-location"
+              id="detailLocation"
+            ></div>
+
+            <div
+              class="details-meta"
+              id="detailMeta"
+            ></div>
+
+            <div class="sub-heading">
+              Why These Findings Were Grouped
             </div>
 
-            <div class="issue-tags">
-              <span class="issue-tag">Large Class</span>
-              <span class="issue-tag">Weak Cohesion</span>
-            </div>
-
-            <div class="score-row">
-              <span>Maintainability Priority</span>
-              <span class="score">61 / 100</span>
-            </div>
-
-          </div>
-
-          <div
-            class="issue-card issue-selectable"
-            data-group="calculateFee"
-          >
-
-            <div class="issue-header">
-              <div class="issue-location">
-                calculateFee()
-              </div>
-
-              <div class="priority priority-low">
-                LOW
-              </div>
-            </div>
-
-            <div class="issue-tags">
-              <span class="issue-tag">Poor Naming</span>
-            </div>
-
-            <div class="score-row">
-              <span>Maintainability Priority</span>
-              <span class="score">28 / 100</span>
-            </div>
-
-          </div>
-
-          <div class="details-card">
-
-            <div class="details-title" id="detailTitle">
-              High Priority Issue Group
-            </div>
-
-            <div class="details-location" id="detailLocation">
-              ApplicationService.java → processApplication()
-            </div>
+            <div
+              class="grouping-box"
+              id="groupingReason"
+            ></div>
 
             <div class="sub-heading">
               Analysis Evidence
@@ -601,8 +590,11 @@ export class CodeQualityPanel {
 
             <div id="evidenceContainer"></div>
 
-            <div class="sub-heading" id="priorityHeading">
-              Why This Group Is High Priority
+            <div
+              class="sub-heading"
+              id="priorityHeading"
+            >
+              Why This Group Has This Priority
             </div>
 
             <div
@@ -621,265 +613,122 @@ export class CodeQualityPanel {
         </div>
 
         <script>
-          const vscode = acquireVsCodeApi();
-
-          const groups = {
-            processApplication: {
-              title: 'High Priority Issue Group',
-              location: 'ApplicationService.java → processApplication()',
-              priority: 'High',
-
-              evidence: [
-                {
-                  name: 'Long Method',
-                  value: 'Method length: 85 lines · Configured threshold: 40'
-                },
-                {
-                  name: 'High Complexity',
-                  value: 'Complexity value: 17 · Configured threshold: 10'
-                },
-                {
-                  name: 'Duplicated Logic',
-                  value: 'Similarity: 82% · Configured threshold: 75%'
-                }
-              ],
-
-              explanation:
-                'Multiple maintainability issues occur in the same method. ' +
-                'Repeated logic contributes to unnecessary method size, while ' +
-                'complex decision logic makes the method harder to understand ' +
-                'and modify safely. These related findings are therefore treated ' +
-                'as one maintainability concern instead of separate warnings.',
-
-              fixes: [
-                {
-                  title: 'Extract duplicated logic',
-                  reason:
-                    'Remove repeated operations first so the method becomes smaller and shared behaviour is maintained in one place.'
-                },
-                {
-                  title: 'Simplify complex decision logic',
-                  reason:
-                    'Reduce difficult conditional paths after the repeated logic has been separated.'
-                },
-                {
-                  title: 'Split remaining responsibilities',
-                  reason:
-                    'Extract focused methods for the remaining responsibilities if the method is still excessively large.'
-                },
-                {
-                  title: 'Improve naming after restructuring',
-                  reason:
-                    'Use clear names for the final extracted methods and variables after their responsibilities are established.'
-                }
-              ]
-            },
-
-            userService: {
-              title: 'Medium Priority Issue Group',
-              location: 'UserService.java → UserService',
-              priority: 'Medium',
-
-              evidence: [
-                {
-                  name: 'Large Class',
-                  value:
-                    'Class contains multiple methods and fields beyond the configured maintainability profile.'
-                },
-                {
-                  name: 'Weak Cohesion',
-                  value:
-                    'Several methods operate on separate groups of class fields.'
-                }
-              ],
-
-              explanation:
-                'The class contains multiple responsibilities and its methods do not strongly relate to the same internal state. ' +
-                'These findings are grouped because class size and weak cohesion together indicate a broader maintainability concern.',
-
-              fixes: [
-                {
-                  title: 'Identify separate responsibility groups',
-                  reason:
-                    'Determine which methods and fields belong to different responsibilities before changing the class structure.'
-                },
-                {
-                  title: 'Extract focused classes',
-                  reason:
-                    'Move related methods and fields into smaller classes with clearer responsibilities.'
-                },
-                {
-                  title: 'Review the remaining class',
-                  reason:
-                    'Check whether the original class is now cohesive and easier to understand.'
-                }
-              ]
-            },
-
-            calculateFee: {
-              title: 'Low Priority Issue Group',
-              location: 'PaymentService.java → calculateFee()',
-              priority: 'Low',
-
-              evidence: [
-                {
-                  name: 'Poor Naming',
-                  value:
-                    'One or more identifiers use unclear or weakly descriptive names.'
-                }
-              ],
-
-              explanation:
-                'The detected issue affects readability, but no additional maintainability problems are currently grouped with it. ' +
-                'Therefore, it receives a lower fixing priority than the other issue groups.',
-
-              fixes: [
-                {
-                  title: 'Review unclear identifiers',
-                  reason:
-                    'Identify names that do not clearly communicate their purpose.'
-                },
-                {
-                  title: 'Rename using domain-relevant terms',
-                  reason:
-                    'Use names that describe the value, responsibility, or operation more clearly.'
-                }
-              ]
-            }
-          };
-
-          function renderGroup(groupKey) {
-            const group = groups[groupKey];
-
-            document.getElementById('detailTitle').textContent =
-              group.title;
-
-            document.getElementById('detailLocation').textContent =
-              group.location;
-
-            document.getElementById('priorityHeading').textContent =
-              'Why This Group Is ' + group.priority + ' Priority';
-
-            document.getElementById('priorityExplanation').textContent =
-              group.explanation;
-
-            const evidenceContainer =
-              document.getElementById('evidenceContainer');
-
-            evidenceContainer.innerHTML = group.evidence
-              .map(
-                item => \`
-                  <div class="evidence-row">
-                    <div class="evidence-name">\${item.name}</div>
-                    <div class="evidence-values">\${item.value}</div>
-                  </div>
-                \`
-              )
-              .join('');
-
-            const fixOrderContainer =
-              document.getElementById('fixOrderContainer');
-
-            fixOrderContainer.innerHTML = group.fixes
-              .map(
-                (step, index) => \`
-                  <div class="fix-step">
-
-                    <div class="step-number">
-                      \${index + 1}
-                    </div>
-
-                    <div>
-                      <div class="step-title">
-                        \${step.title}
-                      </div>
-
-                      <div class="step-reason">
-                        \${step.reason}
-                      </div>
-                    </div>
-
-                  </div>
-                \`
-              )
-              .join('');
-          }
-
-          const cards =
-            document.querySelectorAll('.issue-selectable');
+          const vscode =
+            acquireVsCodeApi();
 
           const analyzeButton =
-            document.getElementById('analyzeButton');
+            document.getElementById(
+              'analyzeButton'
+            );
 
           const analysisStatus =
-            document.getElementById('analysisStatus');
+            document.getElementById(
+              'analysisStatus'
+            );
 
           const analysisResults =
-            document.getElementById('analysisResults');
+            document.getElementById(
+              'analysisResults'
+            );
 
           const targetFile =
-            document.getElementById('targetFile');
+            document.getElementById(
+              'targetFile'
+            );
 
-          const realResults =
-            document.getElementById('realResults');
+          const groupCount =
+            document.getElementById(
+              'groupCount'
+            );
 
-          const realSummary =
-            document.getElementById('realSummary');
+          const highPriorityCount =
+            document.getElementById(
+              'highPriorityCount'
+            );
 
-          const realGroups =
-            document.getElementById('realGroups');
+          const issueCount =
+            document.getElementById(
+              'issueCount'
+            );
 
-          const realMethods =
-            document.getElementById('realMethods');
+          const rankedGroups =
+            document.getElementById(
+              'rankedGroups'
+            );
 
-          const realClasses =
-            document.getElementById('realClasses');
+          const detailsCard =
+            document.getElementById(
+              'detailsCard'
+            );
 
-          const realDuplicates =
-            document.getElementById('realDuplicates');
+          const detailTitle =
+            document.getElementById(
+              'detailTitle'
+            );
 
-          cards.forEach(card => {
-            card.addEventListener('click', () => {
-              cards.forEach(item =>
-                item.classList.remove('active')
+          const detailLocation =
+            document.getElementById(
+              'detailLocation'
+            );
+
+          const detailMeta =
+            document.getElementById(
+              'detailMeta'
+            );
+
+          const groupingReason =
+            document.getElementById(
+              'groupingReason'
+            );
+
+          const evidenceContainer =
+            document.getElementById(
+              'evidenceContainer'
+            );
+
+          const priorityHeading =
+            document.getElementById(
+              'priorityHeading'
+            );
+
+          const priorityExplanation =
+            document.getElementById(
+              'priorityExplanation'
+            );
+
+          const fixOrderContainer =
+            document.getElementById(
+              'fixOrderContainer'
+            );
+
+          let currentResult = null;
+          let selectedGroupIndex = 0;
+
+          analyzeButton.addEventListener(
+            'click',
+            () => {
+              analyzeButton.disabled =
+                true;
+
+              analyzeButton.textContent =
+                'Analyzing...';
+
+              analysisStatus.style.display =
+                'block';
+
+              analysisStatus.textContent =
+                'Running real Java maintainability analysis...';
+
+              analysisResults.classList.remove(
+                'visible'
               );
 
-              card.classList.add('active');
-
-              const groupKey =
-                card.getAttribute('data-group');
-
-              if (groupKey) {
-                renderGroup(groupKey);
-              }
-            });
-          });
-
-          analyzeButton.addEventListener('click', () => {
-            analyzeButton.disabled = true;
-
-            analyzeButton.textContent =
-              'Analyzing...';
-
-            analysisStatus.style.display =
-              'block';
-
-            analysisStatus.textContent =
-              'Running real Java maintainability analysis...';
-
-            realResults.classList.remove(
-              'visible'
-            );
-
-            analysisResults.classList.remove(
-              'visible'
-            );
-
-            vscode.postMessage({
-              command:
-                'analyzeCurrentFile'
-            });
-          });
+              vscode.postMessage({
+                command:
+                  'analyzeCurrentFile'
+              });
+            }
+          );
 
           window.addEventListener(
             'message',
@@ -903,7 +752,7 @@ export class CodeQualityPanel {
                 analysisStatus.textContent =
                   message.message;
 
-                realResults.classList.remove(
+                analysisResults.classList.remove(
                   'visible'
                 );
 
@@ -917,11 +766,13 @@ export class CodeQualityPanel {
                 return;
               }
 
-              const result =
+              currentResult =
                 message.result;
 
+              selectedGroupIndex = 0;
+
               targetFile.textContent =
-                result.fileName;
+                currentResult.fileName;
 
               analyzeButton.disabled =
                 false;
@@ -934,477 +785,574 @@ export class CodeQualityPanel {
 
               analysisStatus.textContent =
                 'Analysis complete. ' +
-                result.totalIssues +
+                currentResult.totalIssues +
                 ' maintainability issue(s) detected.';
 
-              renderRealAnalysis(
-                result
+              renderAnalysis(
+                currentResult
               );
 
-              realResults.classList.add(
+              analysisResults.classList.add(
                 'visible'
               );
             }
           );
 
-          renderGroup(
-            'processApplication'
-          );
-
-          function renderRealAnalysis(result) {
-            const highPriorityCount =
+          function renderAnalysis(
+            result
+          ) {
+            const highCount =
               result.groups.filter(
                 group =>
                   group.priorityLevel ===
                   'High'
               ).length;
 
-            const mediumPriorityCount =
-              result.groups.filter(
-                group =>
-                  group.priorityLevel ===
-                  'Medium'
-              ).length;
+            groupCount.textContent =
+              String(
+                result.groups.length
+              );
 
-            const lowPriorityCount =
-              result.groups.filter(
-                group =>
-                  group.priorityLevel ===
-                  'Low'
-              ).length;
+            highPriorityCount.textContent =
+              String(highCount);
 
-            realSummary.innerHTML = \`
-              <div class="real-result-card">
+            issueCount.textContent =
+              String(
+                result.totalIssues
+              );
 
-                <div class="real-result-title">
-                  \${result.fileName}
+            renderRankedGroups(
+              result.groups
+            );
+
+            if (
+              result.groups.length ===
+              0
+            ) {
+              detailsCard.style.display =
+                'none';
+
+              return;
+            }
+
+            detailsCard.style.display =
+              'block';
+
+            renderGroupDetails(
+              result.groups[0],
+              0
+            );
+          }
+
+          function renderRankedGroups(
+            groups
+          ) {
+            if (
+              groups.length === 0
+            ) {
+              rankedGroups.innerHTML = \`
+                <div class="empty-state">
+                  No maintainability concerns were detected
+                  using the current prototype rules.
                 </div>
+              \`;
 
-                <div class="real-result-line">
-                  Methods analyzed:
-                  \${result.methods.length}
-                </div>
+              return;
+            }
 
-                <div class="real-result-line">
-                  Classes analyzed:
-                  \${result.classes.length}
-                </div>
+            rankedGroups.innerHTML =
+              groups
+                .map(
+                  (group, index) => {
+                    const priorityClass =
+                      group.priorityLevel
+                        .toLowerCase();
 
-                <div class="real-result-line">
-                  Duplicate pairs:
-                  \${result.duplicates.length}
-                </div>
+                    const displayLocation =
+                      getDisplayLocation(
+                        group
+                      );
 
-                <div class="real-result-line">
-                  Maintainability groups:
-                  \${result.groups.length}
-                </div>
+                    const tags =
+                      group.issueTypes
+                        .map(
+                          issueType => \`
+                            <span class="issue-tag">
+                              \${escapeHtml(
+                                issueType
+                              )}
+                            </span>
+                          \`
+                        )
+                        .join('');
 
-                <div class="real-result-line">
-                  High priority groups:
-                  \${highPriorityCount}
-                </div>
+                    const activeClass =
+                      index ===
+                      selectedGroupIndex
+                        ? ' active'
+                        : '';
 
-                <div class="real-result-line">
-                  Medium priority groups:
-                  \${mediumPriorityCount}
-                </div>
+                    return \`
+                      <div
+                        class="issue-card issue-selectable\${activeClass}"
+                        data-group-index="\${index}"
+                      >
 
-                <div class="real-result-line">
-                  Low priority groups:
-                  \${lowPriorityCount}
-                </div>
+                        <div class="issue-header">
 
-                <div class="real-result-line">
-                  Total detected issues:
-                  \${result.totalIssues}
-                </div>
+                          <div>
 
+                            <div class="rank-label">
+                              Priority Rank #\${index + 1}
+                            </div>
+
+                            <div class="issue-location">
+                              \${escapeHtml(
+                                displayLocation
+                              )}
+                            </div>
+
+                          </div>
+
+                          <div
+                            class="priority priority-\${priorityClass}"
+                          >
+                            \${escapeHtml(
+                              group.priorityLevel
+                                .toUpperCase()
+                            )}
+                          </div>
+
+                        </div>
+
+                        <div class="issue-tags">
+                          \${tags}
+                        </div>
+
+                        <div class="score-row">
+
+                          <span>
+                            Maintainability Priority
+                          </span>
+
+                          <span class="score">
+                            \${group.priorityScore} / 100
+                          </span>
+
+                        </div>
+
+                      </div>
+                    \`;
+                  }
+                )
+                .join('');
+
+            document
+              .querySelectorAll(
+                '.issue-selectable'
+              )
+              .forEach(
+                card => {
+                  card.addEventListener(
+                    'click',
+                    () => {
+                      if (!currentResult) {
+                        return;
+                      }
+
+                      const indexText =
+                        card.getAttribute(
+                          'data-group-index'
+                        );
+
+                      if (
+                        indexText ===
+                        null
+                      ) {
+                        return;
+                      }
+
+                      const index =
+                        Number(
+                          indexText
+                        );
+
+                      if (
+                        Number.isNaN(
+                          index
+                        ) ||
+                        !currentResult
+                          .groups[index]
+                      ) {
+                        return;
+                      }
+
+                      selectedGroupIndex =
+                        index;
+
+                      document
+                        .querySelectorAll(
+                          '.issue-selectable'
+                        )
+                        .forEach(
+                          item =>
+                            item.classList.remove(
+                              'active'
+                            )
+                        );
+
+                      card.classList.add(
+                        'active'
+                      );
+
+                      renderGroupDetails(
+                        currentResult
+                          .groups[index],
+                        index
+                      );
+                    }
+                  );
+                }
+              );
+          }
+
+          function renderGroupDetails(
+            group,
+            index
+          ) {
+            const displayLocation =
+              getDisplayLocation(
+                group
+              );
+
+            detailTitle.textContent =
+              group.priorityLevel +
+              ' Priority Issue Group';
+
+            detailLocation.textContent =
+              currentResult.fileName +
+              ' → ' +
+              displayLocation;
+
+            const affectedMethods =
+              group.affectedMethods
+                .length === 0
+                ? 'None'
+                : group
+                    .affectedMethods
+                    .map(
+                      method =>
+                        escapeHtml(
+                          method + '()'
+                        )
+                    )
+                    .join(', ');
+
+            const affectedClasses =
+              group.affectedClasses
+                .length === 0
+                ? 'None'
+                : group
+                    .affectedClasses
+                    .map(
+                      className =>
+                        escapeHtml(
+                          className
+                        )
+                    )
+                    .join(', ');
+
+            detailMeta.innerHTML = \`
+              <div>
+                <strong>
+                  Priority Rank:
+                </strong>
+                #\${index + 1}
+              </div>
+
+              <div>
+                <strong>
+                  Maintainability Priority:
+                </strong>
+                \${group.priorityScore} / 100
+              </div>
+
+              <div>
+                <strong>
+                  Issue Types:
+                </strong>
+                \${group.issueTypes
+                  .map(
+                    issueType =>
+                      escapeHtml(
+                        issueType
+                      )
+                  )
+                  .join(', ')}
+              </div>
+
+              <div>
+                <strong>
+                  Affected Methods:
+                </strong>
+                \${affectedMethods}
+              </div>
+
+              <div>
+                <strong>
+                  Affected Classes:
+                </strong>
+                \${affectedClasses}
+              </div>
+
+              <div>
+                <strong>
+                  Raw Findings Grouped:
+                </strong>
+                \${group.rawFindingCount}
               </div>
             \`;
 
-            realGroups.innerHTML =
-              result.groups.length === 0
-                ? ''
-                : \`
-                  <div class="section-title">
-                    Ranked Maintainability Groups
+            groupingReason.textContent =
+              group.groupingReason;
+
+            renderEvidence(
+              group
+            );
+
+            priorityHeading.textContent =
+              'Why This Group Is ' +
+              group.priorityLevel +
+              ' Priority';
+
+            renderPriorityExplanation(
+              group
+            );
+
+            renderFixOrder(
+              group
+            );
+          }
+
+          function renderEvidence(
+            group
+          ) {
+            const evidence = [];
+
+            for (
+              const issue of
+              group.issues
+            ) {
+              evidence.push({
+                name:
+                  issue.type,
+
+                value:
+                  issue.evidence
+              });
+            }
+
+            for (
+              const duplicate of
+              group.duplicatePairs
+            ) {
+              evidence.push({
+                name:
+                  duplicate.firstMethod +
+                  '() ↔ ' +
+                  duplicate.secondMethod +
+                  '()',
+
+                value:
+                  'Structural similarity: ' +
+                  duplicate.similarity +
+                  '% · Configured threshold: ' +
+                  duplicate.threshold +
+                  '%'
+              });
+            }
+
+            if (
+              evidence.length === 0
+            ) {
+              evidenceContainer.innerHTML =
+                \`
+                  <div class="evidence-values">
+                    No additional analysis evidence is available.
                   </div>
-
-                  \${result.groups
-                    .map((group, index) => {
-                      const issueTypes =
-                        group.issueTypes.length === 0
-                          ? 'None'
-                          : group.issueTypes.join(', ');
-
-                      const affectedMethods =
-                        group.affectedMethods.length === 0
-                          ? 'None'
-                          : group.affectedMethods
-                              .map(
-                                method =>
-                                  method + '()'
-                              )
-                              .join(', ');
-
-                      const affectedClasses =
-                        group.affectedClasses.length === 0
-                          ? 'None'
-                          : group.affectedClasses.join(', ');
-
-                      const priorityClass =
-                        group.priorityLevel.toLowerCase();
-
-                      const priorityReasons =
-                        group.priorityReasons.length === 0
-                          ? '<div class="real-result-line">No additional priority evidence.</div>'
-                          : group.priorityReasons
-                              .map(
-                                reason => \`
-                                  <div class="real-issue">
-                                    \${reason}
-                                  </div>
-                                \`
-                              )
-                              .join('');
-
-                      const localEvidence =
-                        group.issues.length === 0
-                          ? ''
-                          : \`
-                            <div class="sub-heading">
-                              Analysis Evidence
-                            </div>
-
-                            \${group.issues
-                              .map(
-                                issue => \`
-                                  <div class="real-issue">
-
-                                    <strong>
-                                      \${issue.type}
-                                    </strong>
-                                    <br>
-
-                                    \${issue.evidence}
-
-                                  </div>
-                                \`
-                              )
-                              .join('')}
-                          \`;
-
-                      const duplicateEvidence =
-                        group.duplicatePairs.length === 0
-                          ? ''
-                          : \`
-                            <div class="sub-heading">
-                              Duplication Evidence
-                            </div>
-
-                            \${group.duplicatePairs
-                              .map(
-                                duplicate => \`
-                                  <div class="real-issue">
-
-                                    <strong>
-                                      \${duplicate.firstMethod}()
-                                      ↔
-                                      \${duplicate.secondMethod}()
-                                    </strong>
-
-                                    <br>
-
-                                    Similarity:
-                                    \${duplicate.similarity}%
-
-                                  </div>
-                                \`
-                              )
-                              .join('')}
-                          \`;
-
-                      const recommendedFixes =
-                        !group.recommendedFixes ||
-                        group.recommendedFixes.length === 0
-                          ? '<div class="real-result-line">No refactoring guidance available.</div>'
-                          : group.recommendedFixes
-                              .map(
-                                step => \`
-                                  <div class="fix-step">
-
-                                    <div class="step-number">
-                                      \${step.order}
-                                    </div>
-
-                                    <div>
-
-                                      <div class="step-title">
-                                        \${step.title}
-                                      </div>
-
-                                      <div class="step-reason">
-                                        \${step.reason}
-                                      </div>
-
-                                      <div class="real-result-line">
-                                        Related to:
-                                        \${step.relatedIssueTypes.join(', ')}
-                                      </div>
-
-                                    </div>
-
-                                  </div>
-                                \`
-                              )
-                              .join('');
-
-                      return \`
-                        <div class="real-result-card">
-
-                          <div class="issue-header">
-
-                            <div>
-
-                              <div class="real-result-title">
-                                #\${index + 1}
-                                ·
-                                \${group.title}
-                              </div>
-
-                              <div class="real-result-line">
-                                \${group.primaryLocation}
-                              </div>
-
-                            </div>
-
-                            <div
-                              class="priority priority-\${priorityClass}"
-                            >
-                              \${group.priorityLevel.toUpperCase()}
-                            </div>
-
-                          </div>
-
-                          <div class="score-row">
-
-                            <span>
-                              Maintainability Priority
-                            </span>
-
-                            <span class="score">
-                              \${group.priorityScore} / 100
-                            </span>
-
-                          </div>
-
-                          <div class="real-result-line">
-                            Kind:
-                            \${group.kind}
-                          </div>
-
-                          <div class="real-result-line">
-                            Issue types:
-                            \${issueTypes}
-                          </div>
-
-                          <div class="real-result-line">
-                            Affected methods:
-                            \${affectedMethods}
-                          </div>
-
-                          <div class="real-result-line">
-                            Affected classes:
-                            \${affectedClasses}
-                          </div>
-
-                          <div class="real-result-line">
-                            Raw findings grouped:
-                            \${group.rawFindingCount}
-                          </div>
-
-                          <div class="sub-heading">
-                            Why These Findings Were Grouped
-                          </div>
-
-                          <div class="real-issue">
-                            \${group.groupingReason}
-                          </div>
-
-                          \${localEvidence}
-
-                          \${duplicateEvidence}
-
-                          <div class="sub-heading">
-                            Why This Group Is
-                            \${group.priorityLevel}
-                            Priority
-                          </div>
-
-                          \${priorityReasons}
-
-                          <div class="sub-heading">
-                            Recommended Fix Order
-                          </div>
-
-                          \${recommendedFixes}
-
-                        </div>
-                      \`;
-                    })
-                    .join('')}
                 \`;
 
-            realMethods.innerHTML =
-              result.methods
-                .map(method => {
-                  const issues =
-                    method.issues.length === 0
-                      ? '<div class="real-result-line">No current method-level issues detected.</div>'
-                      : method.issues
-                          .map(
-                            issue => \`
-                              <div class="real-issue">
+              return;
+            }
 
-                                <strong>
-                                  \${issue.type}
-                                </strong>
-                                <br>
+            evidenceContainer.innerHTML =
+              evidence
+                .map(
+                  item => \`
+                    <div class="evidence-row">
 
-                                \${issue.evidence}
-
-                              </div>
-                            \`
-                          )
-                          .join('');
-
-                  return \`
-                    <div class="real-result-card">
-
-                      <div class="real-result-title">
-                        Method:
-                        \${method.methodName}()
+                      <div class="evidence-name">
+                        \${escapeHtml(
+                          item.name
+                        )}
                       </div>
 
-                      <div class="real-result-line">
-                        Lines:
-                        \${method.startLine}–\${method.endLine}
+                      <div class="evidence-values">
+                        \${escapeHtml(
+                          item.value
+                        )}
                       </div>
-
-                      <div class="real-result-line">
-                        Method length:
-                        \${method.methodLength}
-                      </div>
-
-                      <div class="real-result-line">
-                        Parameters:
-                        \${method.parameterCount}
-                      </div>
-
-                      <div class="real-result-line">
-                        Cyclomatic complexity:
-                        \${method.complexity}
-                      </div>
-
-                      <div class="real-result-line">
-                        Nesting depth:
-                        \${method.nestingDepth}
-                      </div>
-
-                      \${issues}
 
                     </div>
-                  \`;
-                })
+                  \`
+                )
                 .join('');
+          }
 
-            realClasses.innerHTML =
-              result.classes
-                .map(classItem => {
-                  const issues =
-                    classItem.issues.length === 0
-                      ? '<div class="real-result-line">No current class-level issues detected.</div>'
-                      : classItem.issues
-                          .map(
-                            issue => \`
-                              <div class="real-issue">
+          function renderPriorityExplanation(
+            group
+          ) {
+            if (
+              group.priorityReasons
+                .length === 0
+            ) {
+              priorityExplanation.textContent =
+                'No additional priority evidence is available.';
 
-                                <strong>
-                                  \${issue.type}
-                                </strong>
-                                <br>
+              return;
+            }
 
-                                \${issue.evidence}
-
-                              </div>
-                            \`
-                          )
-                          .join('');
-
-                  return \`
-                    <div class="real-result-card">
-
-                      <div class="real-result-title">
-                        Class:
-                        \${classItem.className}
-                      </div>
-
-                      <div class="real-result-line">
-                        Class length:
-                        \${classItem.classLength}
-                      </div>
-
-                      <div class="real-result-line">
-                        Method count:
-                        \${classItem.methodCount}
-                      </div>
-
-                      <div class="real-result-line">
-                        Field count:
-                        \${classItem.fieldCount}
-                      </div>
-
-                      \${issues}
-
+            priorityExplanation.innerHTML =
+              group.priorityReasons
+                .map(
+                  reason => \`
+                    <div class="priority-reason">
+                      \${escapeHtml(
+                        reason
+                      )}
                     </div>
-                  \`;
-                })
+                  \`
+                )
                 .join('');
+          }
 
-            realDuplicates.innerHTML =
-              result.duplicates.length === 0
-                ? ''
-                : \`
-                  <div class="section-title">
-                    Raw Duplicated Logic Candidates
+          function renderFixOrder(
+            group
+          ) {
+            if (
+              !group.recommendedFixes ||
+              group.recommendedFixes
+                .length === 0
+            ) {
+              fixOrderContainer.innerHTML =
+                \`
+                  <div class="evidence-values">
+                    No refactoring guidance is currently available.
                   </div>
+                \`;
 
-                  \${result.duplicates
-                    .map(
-                      duplicate => \`
-                        <div class="real-result-card">
+              return;
+            }
 
-                          <div class="real-result-title">
-                            \${duplicate.firstMethod}()
-                            ↔
-                            \${duplicate.secondMethod}()
+            fixOrderContainer.innerHTML =
+              group.recommendedFixes
+                .map(
+                  step => {
+                    const related =
+                      step
+                        .relatedIssueTypes
+                        .map(
+                          issueType =>
+                            escapeHtml(
+                              issueType
+                            )
+                        )
+                        .join(', ');
+
+                    return \`
+                      <div class="fix-step">
+
+                        <div class="step-number">
+                          \${step.order}
+                        </div>
+
+                        <div>
+
+                          <div class="step-title">
+                            \${escapeHtml(
+                              step.title
+                            )}
                           </div>
 
-                          <div class="real-result-line">
-                            Similarity:
-                            \${duplicate.similarity}%
+                          <div class="step-reason">
+                            \${escapeHtml(
+                              step.reason
+                            )}
                           </div>
 
-                          <div class="real-result-line">
-                            \${duplicate.evidence}
+                          <div class="step-related">
+                            Related to:
+                            \${related}
                           </div>
 
                         </div>
-                      \`
-                    )
-                    .join('')}
-                \`;
+
+                      </div>
+                    \`;
+                  }
+                )
+                .join('');
+          }
+
+          function getDisplayLocation(
+            group
+          ) {
+            if (
+              group.kind ===
+                'Duplication Cluster' &&
+              group.affectedMethods
+                .length > 2
+            ) {
+              return (
+                group
+                  .affectedMethods[0] +
+                '() + ' +
+                (
+                  group
+                    .affectedMethods
+                    .length - 1
+                ) +
+                ' related methods'
+              );
+            }
+
+            return group.primaryLocation;
+          }
+
+          function escapeHtml(
+            value
+          ) {
+            return String(value)
+              .replace(
+                /&/g,
+                '&amp;'
+              )
+              .replace(
+                /</g,
+                '&lt;'
+              )
+              .replace(
+                />/g,
+                '&gt;'
+              )
+              .replace(
+                /"/g,
+                '&quot;'
+              )
+              .replace(
+                /'/g,
+                '&#039;'
+              );
           }
 
         </script>
