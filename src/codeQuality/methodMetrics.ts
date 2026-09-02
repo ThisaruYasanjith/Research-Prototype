@@ -6,6 +6,7 @@ interface MethodDeclaration {
   methodName: string;
   parameterText: string;
   declarationEndIndex: number;
+  isConstructor: boolean;
 }
 
 const MAX_DECLARATION_LINES = 12;
@@ -15,10 +16,12 @@ export function extractMethodMetrics(sourceCode: string): MethodMetrics[] {
 
   const lines = sanitizedSource.split(/\r?\n/);
 
+  const classNames = extractClassNames(sanitizedSource);
+
   const methods: MethodMetrics[] = [];
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const declaration = findMethodDeclaration(lines, lineIndex);
+    const declaration = findMethodDeclaration(lines, lineIndex, classNames);
 
     if (!declaration) {
       continue;
@@ -48,16 +51,22 @@ export function extractMethodMetrics(sourceCode: string): MethodMetrics[] {
       endLine: methodEndIndex + 1,
 
       methodLength,
+
       parameterCount,
+
       complexity,
+
       nestingDepth,
+
+      isConstructor: declaration.isConstructor,
     });
 
     /*
-     * Move directly to the end of the method.
+     * Skip directly to the end of the callable.
      *
-     * This prevents blocks inside the method from
-     * being considered as possible declarations.
+     * This prevents statements and nested blocks inside
+     * the method/constructor from being considered as
+     * possible declarations.
      */
     lineIndex = methodEndIndex;
   }
@@ -66,23 +75,33 @@ export function extractMethodMetrics(sourceCode: string): MethodMetrics[] {
 }
 
 /**
- * Detects both single-line and multi-line Java method
- * declarations.
+ * Collects Java type names declared in the current file.
  *
- * Examples supported:
- *
- * private void process(Order order) {
- *
- * and:
- *
- * private void process(
- *     Order order,
- *     User user)
- *     throws SomeException {
+ * These names are used to distinguish constructors from
+ * ordinary methods.
+ */
+function extractClassNames(sourceCode: string): Set<string> {
+  const names = new Set<string>();
+
+  const classPattern = /\b(?:class|record|enum)\s+([A-Za-z_$][\w$]*)/g;
+
+  let match: RegExpExecArray | null;
+
+  while ((match = classPattern.exec(sourceCode)) !== null) {
+    names.add(match[1]);
+  }
+
+  return names;
+}
+
+/**
+ * Detects Java constructors and ordinary methods,
+ * including declarations spread across multiple lines.
  */
 function findMethodDeclaration(
   lines: string[],
   startIndex: number,
+  classNames: Set<string>,
 ): MethodDeclaration | null {
   const firstLine = lines[startIndex].trim();
 
@@ -103,19 +122,16 @@ function findMethodDeclaration(
     declarationText += " " + currentLine;
 
     /*
-     * A semicolon before an opening brace normally
-     * indicates that this is not a concrete method
-     * implementation.
+     * A semicolon before an opening brace generally means
+     * this is not a concrete method/constructor body.
      */
     if (declarationText.includes(";") && !declarationText.includes("{")) {
       return null;
     }
 
-    if (!declarationText.includes("{")) {
-      continue;
+    if (declarationText.includes("{")) {
+      break;
     }
-
-    break;
   }
 
   if (!declarationText.includes("{")) {
@@ -124,20 +140,83 @@ function findMethodDeclaration(
 
   const normalizedDeclaration = declarationText.replace(/\s+/g, " ").trim();
 
+  /*
+   * -------------------------------------------------------
+   * 1. CONSTRUCTOR CHECK FIRST
+   * -------------------------------------------------------
+   *
+   * Important:
+   *
+   * Constructors must be checked before ordinary methods.
+   *
+   * Otherwise a declaration such as:
+   *
+   * public CacheStore(...) {
+   *
+   * can be incorrectly interpreted by a permissive method
+   * regex as:
+   *
+   * return type = public
+   * method name = CacheStore
+   *
+   * We only accept a constructor candidate when its name
+   * exactly matches a type declared in the current file.
+   */
+
+  const constructorPattern =
+    /^(?:(?:public|protected|private)\s+)?(?:<[^>]+>\s+)?([A-Za-z_$][\w$]*)\s*\(([^;{}]*)\)\s*(?:throws\s+[^{]+)?\{/;
+
+  const constructorMatch = normalizedDeclaration.match(constructorPattern);
+
+  if (constructorMatch) {
+    const constructorName = constructorMatch[1];
+
+    if (classNames.has(constructorName)) {
+      return {
+        methodName: constructorName,
+
+        parameterText: constructorMatch[2],
+
+        declarationEndIndex:
+          startIndex + countDeclarationLines(lines, startIndex) - 1,
+
+        isConstructor: true,
+      };
+    }
+  }
+
+  /*
+   * -------------------------------------------------------
+   * 2. ORDINARY METHOD CHECK
+   * -------------------------------------------------------
+   *
+   * A normal method must have a return type followed by
+   * a method name.
+   *
+   * Examples:
+   *
+   * public void save() {
+   *
+   * private User findUser(String id) {
+   */
   const methodPattern =
     /^(?:(?:public|protected|private)\s+)?(?:(?:static|final|synchronized|abstract|native|strictfp|default)\s+)*(?:<[^>]+>\s+)?[\w$<>\[\],.?]+\s+([A-Za-z_$][\w$]*)\s*\(([^;{}]*)\)\s*(?:throws\s+[^{]+)?\{/;
 
-  const match = normalizedDeclaration.match(methodPattern);
+  const methodMatch = normalizedDeclaration.match(methodPattern);
 
-  if (!match) {
+  if (!methodMatch) {
     return null;
   }
 
   return {
-    methodName: match[1],
-    parameterText: match[2],
+    methodName: methodMatch[1],
+
+    parameterText: methodMatch[2],
+
     declarationEndIndex:
       startIndex + countDeclarationLines(lines, startIndex) - 1,
+
+    isConstructor: false,
   };
 }
 
@@ -183,10 +262,6 @@ function isPossibleMethodStart(line: string): boolean {
   return true;
 }
 
-/**
- * Counts how many physical lines belong to a
- * declaration before its opening brace.
- */
 function countDeclarationLines(lines: string[], startIndex: number): number {
   const maximumIndex = Math.min(
     lines.length - 1,
@@ -266,14 +341,16 @@ function calculateCyclomaticComplexity(methodSource: string): number {
 }
 
 /**
- * Calculates maximum brace nesting inside the method.
+ * Calculates maximum brace nesting inside the callable.
  *
  * This is a supporting prototype metric and is not
- * being presented as cognitive complexity.
+ * presented as cognitive complexity.
  */
 function calculateBlockNestingDepth(methodSource: string): number {
   let currentDepth = 0;
+
   let maximumDepth = 0;
+
   let methodRootSeen = false;
 
   for (const character of methodSource) {
@@ -282,6 +359,7 @@ function calculateBlockNestingDepth(methodSource: string): number {
 
       if (!methodRootSeen) {
         methodRootSeen = true;
+
         continue;
       }
 

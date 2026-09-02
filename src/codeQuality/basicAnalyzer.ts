@@ -88,14 +88,16 @@ export function analyzeJavaSource(
       });
     }
 
-    const namingIndicator = analyzeMethodName(method.methodName);
+    if (!method.isConstructor) {
+      const namingIndicator = analyzeMethodName(method.methodName);
 
-    if (namingIndicator) {
-      issues.push({
-        type: "Poor Naming",
+      if (namingIndicator) {
+        issues.push({
+          type: "Poor Naming",
 
-        evidence: namingIndicator.reason,
-      });
+          evidence: namingIndicator.reason,
+        });
+      }
     }
 
     return {

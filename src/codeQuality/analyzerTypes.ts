@@ -20,6 +20,7 @@ export interface MethodMetrics {
   parameterCount: number;
   complexity: number;
   nestingDepth: number;
+  isConstructor: boolean;
 }
 
 export interface MethodAnalysis extends MethodMetrics {
