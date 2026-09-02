@@ -65,9 +65,9 @@ export function analyzeJavaSource(
         type: "Long Method",
 
         evidence:
-          `Method has ${method.methodLength} lines ` +
-          `(threshold: ${LONG_METHOD_THRESHOLD}).`,
-
+          `Method has ${method.methodLength} effective source lines ` +
+          `(comments and blank lines excluded; ` +
+          `threshold: ${LONG_METHOD_THRESHOLD}).`,
         actualValue: method.methodLength,
 
         threshold: LONG_METHOD_THRESHOLD,
@@ -122,8 +122,9 @@ export function analyzeJavaSource(
         type: "Large Class",
 
         evidence:
-          `Class has ${classItem.classLength} lines ` +
-          `(threshold: ${LARGE_CLASS_LINE_THRESHOLD}).`,
+          `Class has ${classItem.classLength} effective source lines ` +
+          `(comments and blank lines excluded; ` +
+          `threshold: ${LARGE_CLASS_LINE_THRESHOLD}).`,
 
         actualValue: classItem.classLength,
 

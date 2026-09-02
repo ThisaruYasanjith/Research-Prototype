@@ -4,7 +4,9 @@
  *
  * This prevents braces and keywords inside comments or strings
  * from affecting basic source-code measurements.
- * This is shared source-processing logic so we don't duplicate it everywhere.
+ *
+ * This is shared source-processing logic so we do not duplicate
+ * it across the individual analyzers.
  */
 export function sanitizeJavaSource(source: string): string {
   let result = "";
@@ -56,6 +58,7 @@ export function sanitizeJavaSource(source: string): string {
       }
 
       escaped = current === "\\" && !escaped;
+
       result += " ";
       continue;
     }
@@ -72,6 +75,7 @@ export function sanitizeJavaSource(source: string): string {
       }
 
       escaped = current === "\\" && !escaped;
+
       result += " ";
       continue;
     }
@@ -108,6 +112,45 @@ export function sanitizeJavaSource(source: string): string {
   }
 
   return result;
+}
+
+/**
+ * Counts effective source lines inside a range of an already
+ * sanitized Java source file.
+ *
+ * Effective source line:
+ * - contains source structure/code after comments are removed
+ * - is not blank
+ *
+ * Therefore blank lines and comment-only lines are excluded.
+ *
+ * Brace-only lines are intentionally counted because they remain
+ * part of the source structure.
+ */
+export function countEffectiveSourceLines(
+  sanitizedLines: string[],
+  startIndex: number,
+  endIndex: number,
+): number {
+  const safeStart = Math.max(0, startIndex);
+
+  const safeEnd = Math.min(sanitizedLines.length - 1, endIndex);
+
+  if (safeStart > safeEnd) {
+    return 0;
+  }
+
+  let lineCount = 0;
+
+  for (let index = safeStart; index <= safeEnd; index++) {
+    const line = sanitizedLines[index].trim();
+
+    if (line.length > 0) {
+      lineCount++;
+    }
+  }
+
+  return lineCount;
 }
 
 /**

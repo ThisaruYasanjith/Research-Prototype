@@ -1,4 +1,8 @@
-import { findBlockEnd, sanitizeJavaSource } from "./analysisUtils";
+import {
+  countEffectiveSourceLines,
+  findBlockEnd,
+  sanitizeJavaSource,
+} from "./analysisUtils";
 
 import { MethodMetrics } from "./analyzerTypes";
 
@@ -35,7 +39,11 @@ export function extractMethodMetrics(sourceCode: string): MethodMetrics[] {
 
     const methodSource = lines.slice(lineIndex, methodEndIndex + 1).join("\n");
 
-    const methodLength = methodEndIndex - lineIndex + 1;
+    const methodLength = countEffectiveSourceLines(
+      lines,
+      lineIndex,
+      methodEndIndex,
+    );
 
     const parameterCount = countParameters(declaration.parameterText);
 

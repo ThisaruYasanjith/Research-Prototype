@@ -6,7 +6,11 @@
  * by the maintainability analyzer.
  */
 
-import { findBlockEnd, sanitizeJavaSource } from "./analysisUtils";
+import {
+  countEffectiveSourceLines,
+  findBlockEnd,
+  sanitizeJavaSource,
+} from "./analysisUtils";
 
 import { ClassMetrics, MethodMetrics } from "./analyzerTypes";
 
@@ -72,7 +76,7 @@ export function extractClassMetrics(
 
       endLine,
 
-      classLength: classEndIndex - lineIndex + 1,
+      classLength: countEffectiveSourceLines(lines, lineIndex, classEndIndex),
 
       methodCount: classMethods.length,
 
