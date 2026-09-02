@@ -390,7 +390,7 @@ export class CodeQualityPanel {
             font-size: 11px;
             line-height: 1.4;
           }
-            
+
           .real-results {
             display: none;
             margin-top: 16px;
@@ -468,6 +468,8 @@ export class CodeQualityPanel {
           </div>
 
           <div id="realSummary"></div>
+
+          <div id="realGroups"></div>
 
           <div id="realMethods"></div>
 
@@ -815,6 +817,9 @@ export class CodeQualityPanel {
           const realSummary =
             document.getElementById('realSummary');
 
+          const realGroups =
+            document.getElementById('realGroups');
+
           const realMethods =
             document.getElementById('realMethods');
 
@@ -902,6 +907,7 @@ export class CodeQualityPanel {
           function renderRealAnalysis(result) {
             realSummary.innerHTML = \`
               <div class="real-result-card">
+
                 <div class="real-result-title">
                   \${result.fileName}
                 </div>
@@ -919,10 +925,84 @@ export class CodeQualityPanel {
                 </div>
 
                 <div class="real-result-line">
+                  Maintainability groups: \${result.groups.length}
+                </div>
+
+                <div class="real-result-line">
                   Total detected issues: \${result.totalIssues}
                 </div>
+
               </div>
             \`;
+
+            realGroups.innerHTML =
+              result.groups.length === 0
+                ? ''
+                : \`
+                  <div class="section-title">
+                    Maintainability Groups
+                  </div>
+
+                  \${result.groups
+                    .map(group => {
+                      const issueTypes =
+                        group.issueTypes.length === 0
+                          ? 'None'
+                          : group.issueTypes.join(', ');
+
+                      const affectedMethods =
+                        group.affectedMethods.length === 0
+                          ? 'None'
+                          : group.affectedMethods
+                              .map(method => method + '()')
+                              .join(', ');
+
+                      const affectedClasses =
+                        group.affectedClasses.length === 0
+                          ? 'None'
+                          : group.affectedClasses.join(', ');
+
+                      return \`
+                        <div class="real-result-card">
+
+                          <div class="real-result-title">
+                            \${group.title}
+                          </div>
+
+                          <div class="real-result-line">
+                            Kind: \${group.kind}
+                          </div>
+
+                          <div class="real-result-line">
+                            Location: \${group.primaryLocation}
+                          </div>
+
+                          <div class="real-result-line">
+                            Issue types: \${issueTypes}
+                          </div>
+
+                          <div class="real-result-line">
+                            Affected methods: \${affectedMethods}
+                          </div>
+
+                          <div class="real-result-line">
+                            Affected classes: \${affectedClasses}
+                          </div>
+
+                          <div class="real-result-line">
+                            Raw findings grouped: \${group.rawFindingCount}
+                          </div>
+
+                          <div class="real-issue">
+                            <strong>Grouping reason</strong><br>
+                            \${group.groupingReason}
+                          </div>
+
+                        </div>
+                      \`;
+                    })
+                    .join('')}
+                \`;
 
             realMethods.innerHTML = result.methods
               .map(method => {
