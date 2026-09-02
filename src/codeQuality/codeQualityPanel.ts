@@ -1,4 +1,7 @@
 import * as vscode from "vscode";
+import * as path from "path";
+
+import { analyzeJavaSource } from "./basicAnalyzer";
 
 export class CodeQualityPanel {
   private static currentPanel: vscode.WebviewPanel | undefined;
@@ -24,6 +27,58 @@ export class CodeQualityPanel {
     panel.onDidDispose(() => {
       CodeQualityPanel.currentPanel = undefined;
     });
+
+    panel.webview.onDidReceiveMessage(
+      async (message) => {
+        if (message.command !== "analyzeCurrentFile") {
+          return;
+        }
+
+        const activeEditor = vscode.window.activeTextEditor;
+
+        const javaEditor =
+          activeEditor?.document.languageId === "java"
+            ? activeEditor
+            : vscode.window.visibleTextEditors.find(
+                (editor) => editor.document.languageId === "java",
+              );
+
+        if (!javaEditor) {
+          panel.webview.postMessage({
+            command: "analysisError",
+            message:
+              "No Java source file is currently open. Open a .java file and try again.",
+          });
+
+          return;
+        }
+
+        const document = javaEditor.document;
+
+        try {
+          const sourceCode = document.getText();
+
+          const fileName = path.basename(document.fileName);
+
+          const result = analyzeJavaSource(sourceCode, fileName);
+
+          panel.webview.postMessage({
+            command: "analysisResult",
+            result,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Unknown analysis error.";
+
+          panel.webview.postMessage({
+            command: "analysisError",
+            message,
+          });
+        }
+      },
+      undefined,
+      context.subscriptions,
+    );
 
     panel.webview.html = CodeQualityPanel.getHtmlContent();
   }
@@ -335,6 +390,42 @@ export class CodeQualityPanel {
             font-size: 11px;
             line-height: 1.4;
           }
+            
+          .real-results {
+            display: none;
+            margin-top: 16px;
+          }
+
+          .real-results.visible {
+            display: block;
+          }
+
+          .real-result-card {
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: var(--vscode-editorWidget-background);
+          }
+
+          .real-result-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+          }
+
+          .real-result-line {
+            color: var(--vscode-descriptionForeground);
+            font-size: 11px;
+            line-height: 1.6;
+          }
+
+          .real-issue {
+            margin-top: 6px;
+            padding: 5px 7px;
+            border-left: 2px solid var(--vscode-editorWarning-foreground);
+            background: var(--vscode-textBlockQuote-background);
+            font-size: 11px;
+          }
         </style>
       </head>
 
@@ -356,8 +447,8 @@ export class CodeQualityPanel {
                 Analysis Target
               </div>
 
-              <div class="target-file">
-                ApplicationService.java
+              <div class="target-file" id="targetFile">
+                Open a Java file to analyze
               </div>
             </div>
 
@@ -369,6 +460,22 @@ export class CodeQualityPanel {
         </div>
 
         <div class="analysis-status" id="analysisStatus"></div>
+
+        <div class="real-results" id="realResults">
+
+          <div class="section-title">
+            Real Analyzer Output
+          </div>
+
+          <div id="realSummary"></div>
+
+          <div id="realMethods"></div>
+
+          <div id="realClasses"></div>
+
+          <div id="realDuplicates"></div>
+
+        </div>
 
         <div class="analysis-results" id="analysisResults">
 
@@ -512,6 +619,8 @@ export class CodeQualityPanel {
         </div>
 
         <script>
+          const vscode = acquireVsCodeApi();
+
           const groups = {
             processApplication: {
               title: 'High Priority Issue Group',
@@ -697,6 +806,24 @@ export class CodeQualityPanel {
           const analysisResults =
             document.getElementById('analysisResults');
 
+          const targetFile =
+            document.getElementById('targetFile');
+
+          const realResults =
+            document.getElementById('realResults');
+
+          const realSummary =
+            document.getElementById('realSummary');
+
+          const realMethods =
+            document.getElementById('realMethods');
+
+          const realClasses =
+            document.getElementById('realClasses');
+
+          const realDuplicates =
+            document.getElementById('realDuplicates');
+
           cards.forEach(card => {
             card.addEventListener('click', () => {
               cards.forEach(item =>
@@ -721,37 +848,209 @@ export class CodeQualityPanel {
             analysisStatus.style.display = 'block';
 
             analysisStatus.textContent =
-              'Analyzing code cleanliness and maintainability indicators...';
+              'Running real Java maintainability analysis...';
+
+            realResults.classList.remove('visible');
 
             analysisResults.classList.remove('visible');
 
-            setTimeout(() => {
-              analysisStatus.textContent =
-                'Analysis complete. 6 maintainability issues were organized into 3 issue groups.';
+            vscode.postMessage({
+              command: 'analyzeCurrentFile'
+            });
+          });
 
-              analysisResults.classList.add('visible');
+          window.addEventListener('message', event => {
+            const message = event.data;
 
+            if (message.command === 'analysisError') {
               analyzeButton.disabled = false;
-              analyzeButton.textContent = 'Analyze Again';
+              analyzeButton.textContent = 'Analyze Current File';
 
-              cards.forEach(item =>
-                item.classList.remove('active')
-              );
+              analysisStatus.style.display = 'block';
+              analysisStatus.textContent = message.message;
 
-              const firstCard =
-                document.querySelector(
-                  '[data-group="processApplication"]'
-                );
+              realResults.classList.remove('visible');
 
-              if (firstCard) {
-                firstCard.classList.add('active');
-              }
+              return;
+            }
 
-              renderGroup('processApplication');
-            }, 900);
+            if (message.command !== 'analysisResult') {
+              return;
+            }
+
+            const result = message.result;
+
+            targetFile.textContent = result.fileName;
+
+            analyzeButton.disabled = false;
+            analyzeButton.textContent = 'Analyze Again';
+
+            analysisStatus.style.display = 'block';
+
+            analysisStatus.textContent =
+              'Analysis complete. ' +
+              result.totalIssues +
+              ' maintainability issue(s) detected.';
+
+            renderRealAnalysis(result);
+
+            realResults.classList.add('visible');
           });
 
           renderGroup('processApplication');
+
+          function renderRealAnalysis(result) {
+            realSummary.innerHTML = \`
+              <div class="real-result-card">
+                <div class="real-result-title">
+                  \${result.fileName}
+                </div>
+
+                <div class="real-result-line">
+                  Methods analyzed: \${result.methods.length}
+                </div>
+
+                <div class="real-result-line">
+                  Classes analyzed: \${result.classes.length}
+                </div>
+
+                <div class="real-result-line">
+                  Duplicate pairs: \${result.duplicates.length}
+                </div>
+
+                <div class="real-result-line">
+                  Total detected issues: \${result.totalIssues}
+                </div>
+              </div>
+            \`;
+
+            realMethods.innerHTML = result.methods
+              .map(method => {
+                const issues =
+                  method.issues.length === 0
+                    ? '<div class="real-result-line">No current method-level issues detected.</div>'
+                    : method.issues
+                        .map(
+                          issue => \`
+                            <div class="real-issue">
+                              <strong>\${issue.type}</strong><br>
+                              \${issue.evidence}
+                            </div>
+                          \`
+                        )
+                        .join('');
+
+                return \`
+                  <div class="real-result-card">
+
+                    <div class="real-result-title">
+                      Method: \${method.methodName}()
+                    </div>
+
+                    <div class="real-result-line">
+                      Lines: \${method.startLine}–\${method.endLine}
+                    </div>
+
+                    <div class="real-result-line">
+                      Method length: \${method.methodLength}
+                    </div>
+
+                    <div class="real-result-line">
+                      Parameters: \${method.parameterCount}
+                    </div>
+
+                    <div class="real-result-line">
+                      Cyclomatic complexity: \${method.complexity}
+                    </div>
+
+                    <div class="real-result-line">
+                      Nesting depth: \${method.nestingDepth}
+                    </div>
+
+                    \${issues}
+
+                  </div>
+                \`;
+              })
+              .join('');
+
+            realClasses.innerHTML = result.classes
+              .map(classItem => {
+                const issues =
+                  classItem.issues.length === 0
+                    ? '<div class="real-result-line">No current class-level issues detected.</div>'
+                    : classItem.issues
+                        .map(
+                          issue => \`
+                            <div class="real-issue">
+                              <strong>\${issue.type}</strong><br>
+                              \${issue.evidence}
+                            </div>
+                          \`
+                        )
+                        .join('');
+
+                return \`
+                  <div class="real-result-card">
+
+                    <div class="real-result-title">
+                      Class: \${classItem.className}
+                    </div>
+
+                    <div class="real-result-line">
+                      Class length: \${classItem.classLength}
+                    </div>
+
+                    <div class="real-result-line">
+                      Method count: \${classItem.methodCount}
+                    </div>
+
+                    <div class="real-result-line">
+                      Field count: \${classItem.fieldCount}
+                    </div>
+
+                    \${issues}
+
+                  </div>
+                \`;
+              })
+              .join('');
+
+            realDuplicates.innerHTML =
+              result.duplicates.length === 0
+                ? ''
+                : \`
+                  <div class="section-title">
+                    Duplicated Logic Candidates
+                  </div>
+
+                  \${result.duplicates
+                    .map(
+                      duplicate => \`
+                        <div class="real-result-card">
+
+                          <div class="real-result-title">
+                            \${duplicate.firstMethod}()
+                            ↔
+                            \${duplicate.secondMethod}()
+                          </div>
+
+                          <div class="real-result-line">
+                            Similarity:
+                            \${duplicate.similarity}%
+                          </div>
+
+                          <div class="real-result-line">
+                            \${duplicate.evidence}
+                          </div>
+
+                        </div>
+                      \`
+                    )
+                    .join('')}
+                \`;
+          }
+
         </script>
 
       </body>

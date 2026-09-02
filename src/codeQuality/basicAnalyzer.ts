@@ -159,9 +159,13 @@ export function analyzeJavaSource(
   }
 
   const totalMethodIssues = methods.reduce(
-    (total, method) => total + method.issues.length,
+    (total, method) =>
+      total +
+      method.issues.filter((issue) => issue.type !== "Duplicated Logic").length,
     0,
   );
+
+  const totalDuplicateIssues = duplicates.length;
 
   const totalClassIssues = classes.reduce(
     (total, classItem) => total + classItem.issues.length,
@@ -173,6 +177,6 @@ export function analyzeJavaSource(
     methods,
     classes,
     duplicates,
-    totalIssues: totalMethodIssues + totalClassIssues,
+    totalIssues: totalMethodIssues + totalClassIssues + totalDuplicateIssues,
   };
 }

@@ -2,9 +2,12 @@ import { findBlockEnd, sanitizeJavaSource } from "./analysisUtils";
 
 import { DuplicateAnalysis } from "./analyzerTypes";
 
-const DUPLICATION_THRESHOLD = 75;
-const MINIMUM_TOKEN_COUNT = 12;
-const NGRAM_SIZE = 3;
+const DUPLICATION_THRESHOLD = 85;
+const MINIMUM_TOKEN_COUNT = 20;
+const NGRAM_SIZE = 5;
+const MINIMUM_LENGTH_RATIO = 0.7;
+
+const MAX_DECLARATION_LINES = 12;
 
 interface MethodBlock {
   methodName: string;
@@ -69,11 +72,15 @@ const JAVA_KEYWORDS = new Set([
 ]);
 
 /**
- * Performs lightweight duplicated-logic detection between
- * methods in the same Java source file.
+ * Performs lightweight duplicated-logic detection
+ * between methods in the same Java source file.
  *
- * The prototype normalizes identifiers/numbers and compares
- * token 3-grams using a Dice similarity coefficient.
+ * The prototype:
+ * - sanitizes source,
+ * - normalizes identifiers and numeric values,
+ * - creates token 5-grams,
+ * - compares similarly sized methods,
+ * - calculates Dice similarity.
  */
 export function analyzeDuplicatedLogic(
   sourceCode: string,
@@ -85,12 +92,29 @@ export function analyzeDuplicatedLogic(
   for (let i = 0; i < methods.length; i++) {
     for (let j = i + 1; j < methods.length; j++) {
       const firstMethod = methods[i];
+
       const secondMethod = methods[j];
 
       if (
         firstMethod.normalizedTokens.length < MINIMUM_TOKEN_COUNT ||
         secondMethod.normalizedTokens.length < MINIMUM_TOKEN_COUNT
       ) {
+        continue;
+      }
+
+      const shorterLength = Math.min(
+        firstMethod.normalizedTokens.length,
+        secondMethod.normalizedTokens.length,
+      );
+
+      const longerLength = Math.max(
+        firstMethod.normalizedTokens.length,
+        secondMethod.normalizedTokens.length,
+      );
+
+      const lengthRatio = longerLength === 0 ? 0 : shorterLength / longerLength;
+
+      if (lengthRatio < MINIMUM_LENGTH_RATIO) {
         continue;
       }
 
@@ -111,12 +135,15 @@ export function analyzeDuplicatedLogic(
       if (similarityPercentage >= DUPLICATION_THRESHOLD) {
         duplicates.push({
           firstMethod: firstMethod.methodName,
+
           secondMethod: secondMethod.methodName,
 
           firstStartLine: firstMethod.startLine,
+
           secondStartLine: secondMethod.startLine,
 
           similarity: similarityPercentage,
+
           threshold: DUPLICATION_THRESHOLD,
 
           evidence:
@@ -133,6 +160,10 @@ export function analyzeDuplicatedLogic(
   return duplicates;
 }
 
+/**
+ * Extracts method bodies using both single-line and
+ * multi-line Java method declarations.
+ */
 function extractMethodBlocks(sourceCode: string): MethodBlock[] {
   const sanitizedSource = sanitizeJavaSource(sourceCode);
 
@@ -141,7 +172,7 @@ function extractMethodBlocks(sourceCode: string): MethodBlock[] {
   const methods: MethodBlock[] = [];
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const methodName = findMethodDeclaration(lines[lineIndex]);
+    const methodName = findMethodDeclaration(lines, lineIndex);
 
     if (!methodName) {
       continue;
@@ -171,28 +202,103 @@ function extractMethodBlocks(sourceCode: string): MethodBlock[] {
   return methods;
 }
 
-function findMethodDeclaration(line: string): string | null {
-  const trimmedLine = line.trim();
+/**
+ * Supports declarations such as:
+ *
+ * private void process(Order order) {
+ *
+ * and:
+ *
+ * private void process(
+ *     Order order,
+ *     User user)
+ *     throws SomeException {
+ */
+function findMethodDeclaration(
+  lines: string[],
+  startIndex: number,
+): string | null {
+  const firstLine = lines[startIndex].trim();
 
-  if (
-    trimmedLine.length === 0 ||
-    trimmedLine.startsWith("if") ||
-    trimmedLine.startsWith("for") ||
-    trimmedLine.startsWith("while") ||
-    trimmedLine.startsWith("switch") ||
-    trimmedLine.startsWith("catch") ||
-    trimmedLine.startsWith("else") ||
-    trimmedLine.startsWith("do ")
-  ) {
+  if (!isPossibleMethodStart(firstLine)) {
     return null;
   }
 
-  const methodPattern =
-    /^(?:(?:public|protected|private)\s+)?(?:(?:static|final|synchronized|abstract|native)\s+)*(?:<[^>]+>\s+)?[\w$<>\[\],.?]+\s+([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?:throws\s+[^{]+)?\{/;
+  let declarationText = "";
 
-  const match = trimmedLine.match(methodPattern);
+  const maximumIndex = Math.min(
+    lines.length - 1,
+    startIndex + MAX_DECLARATION_LINES - 1,
+  );
+
+  for (let index = startIndex; index <= maximumIndex; index++) {
+    const currentLine = lines[index].trim();
+
+    declarationText += " " + currentLine;
+
+    if (declarationText.includes(";") && !declarationText.includes("{")) {
+      return null;
+    }
+
+    if (declarationText.includes("{")) {
+      break;
+    }
+  }
+
+  if (!declarationText.includes("{")) {
+    return null;
+  }
+
+  const normalizedDeclaration = declarationText.replace(/\s+/g, " ").trim();
+
+  const methodPattern =
+    /^(?:(?:public|protected|private)\s+)?(?:(?:static|final|synchronized|abstract|native|strictfp|default)\s+)*(?:<[^>]+>\s+)?[\w$<>\[\],.?]+\s+([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?:throws\s+[^{]+)?\{/;
+
+  const match = normalizedDeclaration.match(methodPattern);
 
   return match ? match[1] : null;
+}
+
+function isPossibleMethodStart(line: string): boolean {
+  if (line.length === 0) {
+    return false;
+  }
+
+  if (line.startsWith("//") || line.startsWith("*") || line.startsWith("@")) {
+    return false;
+  }
+
+  const excludedStarts = [
+    "if",
+    "for",
+    "while",
+    "switch",
+    "catch",
+    "else",
+    "do ",
+    "try",
+    "return ",
+    "throw ",
+    "new ",
+    "class ",
+    "interface ",
+    "enum ",
+    "record ",
+    "package ",
+    "import ",
+  ];
+
+  for (const excluded of excludedStarts) {
+    if (
+      line === excluded ||
+      line.startsWith(excluded + " ") ||
+      line.startsWith(excluded + "(")
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function extractMethodBody(methodSource: string): string {
@@ -206,9 +312,10 @@ function extractMethodBody(methodSource: string): string {
 
   return methodSource.slice(firstBrace + 1, lastBrace);
 }
+
 function normalizeMethodBody(methodBody: string): string[] {
   const tokenPattern =
-    /[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|->|::|[{}()[\];,.?:+\-*/%<>=!&|^~]/g;
+    /[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|==|!=|<=|>=|&&|\|\||\+\+|--|\+=|-=|\*=|\/=|%=|->|::|[{}()[\];,.?:+\-*\/%<>=!&|^~]/g;
 
   const tokens = methodBody.match(tokenPattern) ?? [];
 
@@ -246,7 +353,6 @@ function createNgrams(tokens: string[], size: number): string[] {
 /**
  * Calculates a multiset Dice similarity coefficient.
  *
- * Result:
  * 0.0 = no structural overlap
  * 1.0 = identical normalized structure
  */
