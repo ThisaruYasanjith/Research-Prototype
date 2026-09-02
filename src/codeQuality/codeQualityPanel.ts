@@ -784,12 +784,21 @@ export class CodeQualityPanel {
               .map(
                 (step, index) => \`
                   <div class="fix-step">
-                    <div class="step-number">\${index + 1}</div>
+
+                    <div class="step-number">
+                      \${index + 1}
+                    </div>
 
                     <div>
-                      <div class="step-title">\${step.title}</div>
-                      <div class="step-reason">\${step.reason}</div>
+                      <div class="step-title">
+                        \${step.title}
+                      </div>
+
+                      <div class="step-reason">
+                        \${step.reason}
+                      </div>
                     </div>
+
                   </div>
                 \`
               )
@@ -848,76 +857,120 @@ export class CodeQualityPanel {
 
           analyzeButton.addEventListener('click', () => {
             analyzeButton.disabled = true;
-            analyzeButton.textContent = 'Analyzing...';
 
-            analysisStatus.style.display = 'block';
+            analyzeButton.textContent =
+              'Analyzing...';
+
+            analysisStatus.style.display =
+              'block';
 
             analysisStatus.textContent =
               'Running real Java maintainability analysis...';
 
-            realResults.classList.remove('visible');
+            realResults.classList.remove(
+              'visible'
+            );
 
-            analysisResults.classList.remove('visible');
+            analysisResults.classList.remove(
+              'visible'
+            );
 
             vscode.postMessage({
-              command: 'analyzeCurrentFile'
+              command:
+                'analyzeCurrentFile'
             });
           });
 
-          window.addEventListener('message', event => {
-            const message = event.data;
+          window.addEventListener(
+            'message',
+            event => {
+              const message =
+                event.data;
 
-            if (message.command === 'analysisError') {
-              analyzeButton.disabled = false;
-              analyzeButton.textContent = 'Analyze Current File';
+              if (
+                message.command ===
+                'analysisError'
+              ) {
+                analyzeButton.disabled =
+                  false;
 
-              analysisStatus.style.display = 'block';
-              analysisStatus.textContent = message.message;
+                analyzeButton.textContent =
+                  'Analyze Current File';
 
-              realResults.classList.remove('visible');
+                analysisStatus.style.display =
+                  'block';
 
-              return;
+                analysisStatus.textContent =
+                  message.message;
+
+                realResults.classList.remove(
+                  'visible'
+                );
+
+                return;
+              }
+
+              if (
+                message.command !==
+                'analysisResult'
+              ) {
+                return;
+              }
+
+              const result =
+                message.result;
+
+              targetFile.textContent =
+                result.fileName;
+
+              analyzeButton.disabled =
+                false;
+
+              analyzeButton.textContent =
+                'Analyze Again';
+
+              analysisStatus.style.display =
+                'block';
+
+              analysisStatus.textContent =
+                'Analysis complete. ' +
+                result.totalIssues +
+                ' maintainability issue(s) detected.';
+
+              renderRealAnalysis(
+                result
+              );
+
+              realResults.classList.add(
+                'visible'
+              );
             }
+          );
 
-            if (message.command !== 'analysisResult') {
-              return;
-            }
-
-            const result = message.result;
-
-            targetFile.textContent = result.fileName;
-
-            analyzeButton.disabled = false;
-            analyzeButton.textContent = 'Analyze Again';
-
-            analysisStatus.style.display = 'block';
-
-            analysisStatus.textContent =
-              'Analysis complete. ' +
-              result.totalIssues +
-              ' maintainability issue(s) detected.';
-
-            renderRealAnalysis(result);
-
-            realResults.classList.add('visible');
-          });
-
-          renderGroup('processApplication');
+          renderGroup(
+            'processApplication'
+          );
 
           function renderRealAnalysis(result) {
             const highPriorityCount =
               result.groups.filter(
-                group => group.priorityLevel === 'High'
+                group =>
+                  group.priorityLevel ===
+                  'High'
               ).length;
 
             const mediumPriorityCount =
               result.groups.filter(
-                group => group.priorityLevel === 'Medium'
+                group =>
+                  group.priorityLevel ===
+                  'Medium'
               ).length;
 
             const lowPriorityCount =
               result.groups.filter(
-                group => group.priorityLevel === 'Low'
+                group =>
+                  group.priorityLevel ===
+                  'Low'
               ).length;
 
             realSummary.innerHTML = \`
@@ -928,35 +981,43 @@ export class CodeQualityPanel {
                 </div>
 
                 <div class="real-result-line">
-                  Methods analyzed: \${result.methods.length}
+                  Methods analyzed:
+                  \${result.methods.length}
                 </div>
 
                 <div class="real-result-line">
-                  Classes analyzed: \${result.classes.length}
+                  Classes analyzed:
+                  \${result.classes.length}
                 </div>
 
                 <div class="real-result-line">
-                  Duplicate pairs: \${result.duplicates.length}
+                  Duplicate pairs:
+                  \${result.duplicates.length}
                 </div>
 
                 <div class="real-result-line">
-                  Maintainability groups: \${result.groups.length}
+                  Maintainability groups:
+                  \${result.groups.length}
                 </div>
 
                 <div class="real-result-line">
-                  High priority groups: \${highPriorityCount}
+                  High priority groups:
+                  \${highPriorityCount}
                 </div>
 
                 <div class="real-result-line">
-                  Medium priority groups: \${mediumPriorityCount}
+                  Medium priority groups:
+                  \${mediumPriorityCount}
                 </div>
 
                 <div class="real-result-line">
-                  Low priority groups: \${lowPriorityCount}
+                  Low priority groups:
+                  \${lowPriorityCount}
                 </div>
 
                 <div class="real-result-line">
-                  Total detected issues: \${result.totalIssues}
+                  Total detected issues:
+                  \${result.totalIssues}
                 </div>
 
               </div>
@@ -981,7 +1042,10 @@ export class CodeQualityPanel {
                         group.affectedMethods.length === 0
                           ? 'None'
                           : group.affectedMethods
-                              .map(method => method + '()')
+                              .map(
+                                method =>
+                                  method + '()'
+                              )
                               .join(', ');
 
                       const affectedClasses =
@@ -1017,8 +1081,14 @@ export class CodeQualityPanel {
                               .map(
                                 issue => \`
                                   <div class="real-issue">
-                                    <strong>\${issue.type}</strong><br>
+
+                                    <strong>
+                                      \${issue.type}
+                                    </strong>
+                                    <br>
+
                                     \${issue.evidence}
+
                                   </div>
                                 \`
                               )
@@ -1037,19 +1107,58 @@ export class CodeQualityPanel {
                               .map(
                                 duplicate => \`
                                   <div class="real-issue">
+
                                     <strong>
                                       \${duplicate.firstMethod}()
                                       ↔
                                       \${duplicate.secondMethod}()
                                     </strong>
+
                                     <br>
+
                                     Similarity:
                                     \${duplicate.similarity}%
+
                                   </div>
                                 \`
                               )
                               .join('')}
                           \`;
+
+                      const recommendedFixes =
+                        !group.recommendedFixes ||
+                        group.recommendedFixes.length === 0
+                          ? '<div class="real-result-line">No refactoring guidance available.</div>'
+                          : group.recommendedFixes
+                              .map(
+                                step => \`
+                                  <div class="fix-step">
+
+                                    <div class="step-number">
+                                      \${step.order}
+                                    </div>
+
+                                    <div>
+
+                                      <div class="step-title">
+                                        \${step.title}
+                                      </div>
+
+                                      <div class="step-reason">
+                                        \${step.reason}
+                                      </div>
+
+                                      <div class="real-result-line">
+                                        Related to:
+                                        \${step.relatedIssueTypes.join(', ')}
+                                      </div>
+
+                                    </div>
+
+                                  </div>
+                                \`
+                              )
+                              .join('');
 
                       return \`
                         <div class="real-result-card">
@@ -1057,13 +1166,17 @@ export class CodeQualityPanel {
                           <div class="issue-header">
 
                             <div>
+
                               <div class="real-result-title">
-                                #\${index + 1} · \${group.title}
+                                #\${index + 1}
+                                ·
+                                \${group.title}
                               </div>
 
                               <div class="real-result-line">
                                 \${group.primaryLocation}
                               </div>
+
                             </div>
 
                             <div
@@ -1075,6 +1188,7 @@ export class CodeQualityPanel {
                           </div>
 
                           <div class="score-row">
+
                             <span>
                               Maintainability Priority
                             </span>
@@ -1082,22 +1196,27 @@ export class CodeQualityPanel {
                             <span class="score">
                               \${group.priorityScore} / 100
                             </span>
+
                           </div>
 
                           <div class="real-result-line">
-                            Kind: \${group.kind}
+                            Kind:
+                            \${group.kind}
                           </div>
 
                           <div class="real-result-line">
-                            Issue types: \${issueTypes}
+                            Issue types:
+                            \${issueTypes}
                           </div>
 
                           <div class="real-result-line">
-                            Affected methods: \${affectedMethods}
+                            Affected methods:
+                            \${affectedMethods}
                           </div>
 
                           <div class="real-result-line">
-                            Affected classes: \${affectedClasses}
+                            Affected classes:
+                            \${affectedClasses}
                           </div>
 
                           <div class="real-result-line">
@@ -1119,10 +1238,17 @@ export class CodeQualityPanel {
 
                           <div class="sub-heading">
                             Why This Group Is
-                            \${group.priorityLevel} Priority
+                            \${group.priorityLevel}
+                            Priority
                           </div>
 
                           \${priorityReasons}
+
+                          <div class="sub-heading">
+                            Recommended Fix Order
+                          </div>
+
+                          \${recommendedFixes}
 
                         </div>
                       \`;
@@ -1130,105 +1256,121 @@ export class CodeQualityPanel {
                     .join('')}
                 \`;
 
-            realMethods.innerHTML = result.methods
-              .map(method => {
-                const issues =
-                  method.issues.length === 0
-                    ? '<div class="real-result-line">No current method-level issues detected.</div>'
-                    : method.issues
-                        .map(
-                          issue => \`
-                            <div class="real-issue">
-                              <strong>\${issue.type}</strong><br>
-                              \${issue.evidence}
-                            </div>
-                          \`
-                        )
-                        .join('');
+            realMethods.innerHTML =
+              result.methods
+                .map(method => {
+                  const issues =
+                    method.issues.length === 0
+                      ? '<div class="real-result-line">No current method-level issues detected.</div>'
+                      : method.issues
+                          .map(
+                            issue => \`
+                              <div class="real-issue">
 
-                return \`
-                  <div class="real-result-card">
+                                <strong>
+                                  \${issue.type}
+                                </strong>
+                                <br>
 
-                    <div class="real-result-title">
-                      Method: \${method.methodName}()
+                                \${issue.evidence}
+
+                              </div>
+                            \`
+                          )
+                          .join('');
+
+                  return \`
+                    <div class="real-result-card">
+
+                      <div class="real-result-title">
+                        Method:
+                        \${method.methodName}()
+                      </div>
+
+                      <div class="real-result-line">
+                        Lines:
+                        \${method.startLine}–\${method.endLine}
+                      </div>
+
+                      <div class="real-result-line">
+                        Method length:
+                        \${method.methodLength}
+                      </div>
+
+                      <div class="real-result-line">
+                        Parameters:
+                        \${method.parameterCount}
+                      </div>
+
+                      <div class="real-result-line">
+                        Cyclomatic complexity:
+                        \${method.complexity}
+                      </div>
+
+                      <div class="real-result-line">
+                        Nesting depth:
+                        \${method.nestingDepth}
+                      </div>
+
+                      \${issues}
+
                     </div>
+                  \`;
+                })
+                .join('');
 
-                    <div class="real-result-line">
-                      Lines:
-                      \${method.startLine}–\${method.endLine}
+            realClasses.innerHTML =
+              result.classes
+                .map(classItem => {
+                  const issues =
+                    classItem.issues.length === 0
+                      ? '<div class="real-result-line">No current class-level issues detected.</div>'
+                      : classItem.issues
+                          .map(
+                            issue => \`
+                              <div class="real-issue">
+
+                                <strong>
+                                  \${issue.type}
+                                </strong>
+                                <br>
+
+                                \${issue.evidence}
+
+                              </div>
+                            \`
+                          )
+                          .join('');
+
+                  return \`
+                    <div class="real-result-card">
+
+                      <div class="real-result-title">
+                        Class:
+                        \${classItem.className}
+                      </div>
+
+                      <div class="real-result-line">
+                        Class length:
+                        \${classItem.classLength}
+                      </div>
+
+                      <div class="real-result-line">
+                        Method count:
+                        \${classItem.methodCount}
+                      </div>
+
+                      <div class="real-result-line">
+                        Field count:
+                        \${classItem.fieldCount}
+                      </div>
+
+                      \${issues}
+
                     </div>
-
-                    <div class="real-result-line">
-                      Method length:
-                      \${method.methodLength}
-                    </div>
-
-                    <div class="real-result-line">
-                      Parameters:
-                      \${method.parameterCount}
-                    </div>
-
-                    <div class="real-result-line">
-                      Cyclomatic complexity:
-                      \${method.complexity}
-                    </div>
-
-                    <div class="real-result-line">
-                      Nesting depth:
-                      \${method.nestingDepth}
-                    </div>
-
-                    \${issues}
-
-                  </div>
-                \`;
-              })
-              .join('');
-
-            realClasses.innerHTML = result.classes
-              .map(classItem => {
-                const issues =
-                  classItem.issues.length === 0
-                    ? '<div class="real-result-line">No current class-level issues detected.</div>'
-                    : classItem.issues
-                        .map(
-                          issue => \`
-                            <div class="real-issue">
-                              <strong>\${issue.type}</strong><br>
-                              \${issue.evidence}
-                            </div>
-                          \`
-                        )
-                        .join('');
-
-                return \`
-                  <div class="real-result-card">
-
-                    <div class="real-result-title">
-                      Class: \${classItem.className}
-                    </div>
-
-                    <div class="real-result-line">
-                      Class length:
-                      \${classItem.classLength}
-                    </div>
-
-                    <div class="real-result-line">
-                      Method count:
-                      \${classItem.methodCount}
-                    </div>
-
-                    <div class="real-result-line">
-                      Field count:
-                      \${classItem.fieldCount}
-                    </div>
-
-                    \${issues}
-
-                  </div>
-                \`;
-              })
-              .join('');
+                  \`;
+                })
+                .join('');
 
             realDuplicates.innerHTML =
               result.duplicates.length === 0

@@ -89,23 +89,40 @@ export interface MaintainabilityGroup {
 
 export type MaintainabilityPriorityLevel = "High" | "Medium" | "Low";
 
-/**
- * A grouped maintainability concern after evidence-based
- * priority scoring.
- */
 export interface PrioritizedMaintainabilityGroup extends MaintainabilityGroup {
-  /**
-   * Normalized priority score between 0 and 100.
-   */
   priorityScore: number;
 
   priorityLevel: MaintainabilityPriorityLevel;
 
-  /**
-   * Human-readable evidence explaining why this score
-   * was assigned.
-   */
   priorityReasons: string[];
+}
+
+/**
+ * One ordered refactoring recommendation.
+ *
+ * The order field represents the recommended sequence
+ * within the current maintainability concern.
+ */
+export interface RefactoringStep {
+  order: number;
+
+  title: string;
+
+  reason: string;
+
+  relatedIssueTypes: MaintainabilityIssueType[];
+}
+
+/**
+ * Final maintainability-triage group after:
+ *
+ * detection
+ * → grouping
+ * → priority scoring
+ * → ordered refactoring guidance
+ */
+export interface TriagedMaintainabilityGroup extends PrioritizedMaintainabilityGroup {
+  recommendedFixes: RefactoringStep[];
 }
 
 export interface JavaAnalysisResult {
@@ -117,14 +134,7 @@ export interface JavaAnalysisResult {
 
   duplicates: DuplicateAnalysis[];
 
-  /**
-   * Consolidated and priority-ranked maintainability
-   * concerns.
-   */
-  groups: PrioritizedMaintainabilityGroup[];
+  groups: TriagedMaintainabilityGroup[];
 
-  /**
-   * Number of unique raw findings before grouping.
-   */
   totalIssues: number;
 }

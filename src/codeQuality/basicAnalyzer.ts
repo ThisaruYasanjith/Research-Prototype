@@ -6,6 +6,7 @@ import {
 } from "./analyzerTypes";
 
 import { extractMethodMetrics } from "./methodMetrics";
+
 import { extractClassMetrics } from "./classMetrics";
 
 import { analyzeClassName, analyzeMethodName } from "./namingAnalyzer";
@@ -16,13 +17,8 @@ import { buildMaintainabilityGroups } from "./groupingEngine";
 
 import { prioritizeMaintainabilityGroups } from "./priorityEngine";
 
-/**
- * Prototype maintainability thresholds.
- *
- * These are configurable defaults for the PP1 prototype.
- * They should not be presented as universally applicable
- * maintainability standards.
- */
+import { addRefactoringGuidance } from "./fixOrderEngine";
+
 const LONG_METHOD_THRESHOLD = 40;
 
 const HIGH_COMPLEXITY_THRESHOLD = 10;
@@ -32,23 +28,22 @@ const LARGE_CLASS_LINE_THRESHOLD = 200;
 const LARGE_CLASS_METHOD_THRESHOLD = 15;
 
 /**
- * Coordinates the Java maintainability analysis pipeline.
+ * Coordinates the complete current PP1
+ * maintainability-triage pipeline.
  *
  * Java source
  *   ↓
- * Metric extraction
+ * Metrics
  *   ↓
  * Issue detection
  *   ↓
- * Naming indicators
+ * Duplicated-logic analysis
  *   ↓
- * Duplicated-logic detection
+ * Grouping
  *   ↓
- * Maintainability grouping
+ * Priority scoring
  *   ↓
- * Explainable priority scoring
- *   ↓
- * Ranked maintainability concerns
+ * Ordered refactoring guidance
  */
 export function analyzeJavaSource(
   sourceCode: string,
@@ -65,9 +60,6 @@ export function analyzeJavaSource(
   const methods: MethodAnalysis[] = methodMetrics.map((method) => {
     const issues: DetectedIssue[] = [];
 
-    /*
-     * Long Method
-     */
     if (method.methodLength > LONG_METHOD_THRESHOLD) {
       issues.push({
         type: "Long Method",
@@ -82,9 +74,6 @@ export function analyzeJavaSource(
       });
     }
 
-    /*
-     * High Complexity
-     */
     if (method.complexity > HIGH_COMPLEXITY_THRESHOLD) {
       issues.push({
         type: "High Complexity",
@@ -99,9 +88,6 @@ export function analyzeJavaSource(
       });
     }
 
-    /*
-     * Measurable Poor Naming indicator.
-     */
     const namingIndicator = analyzeMethodName(method.methodName);
 
     if (namingIndicator) {
@@ -129,9 +115,6 @@ export function analyzeJavaSource(
   const classes: ClassAnalysis[] = classMetrics.map((classItem) => {
     const issues: DetectedIssue[] = [];
 
-    /*
-     * Large Class
-     */
     if (classItem.classLength > LARGE_CLASS_LINE_THRESHOLD) {
       issues.push({
         type: "Large Class",
@@ -158,9 +141,6 @@ export function analyzeJavaSource(
       });
     }
 
-    /*
-     * Measurable class naming indicator.
-     */
     const namingIndicator = analyzeClassName(classItem.className);
 
     if (namingIndicator) {
@@ -179,18 +159,12 @@ export function analyzeJavaSource(
 
   /*
    * -------------------------------------------------------
-   * 3. DUPLICATED LOGIC ANALYSIS
+   * 3. DUPLICATED LOGIC
    * -------------------------------------------------------
    */
 
   const duplicates = analyzeDuplicatedLogic(sourceCode);
 
-  /*
-   * Attach pair evidence to both participating methods for
-   * local display.
-   *
-   * The pair itself is still counted only once later.
-   */
   for (const duplicate of duplicates) {
     const firstMethod = methods.find(
       (method) => method.methodName === duplicate.firstMethod,
@@ -256,7 +230,7 @@ export function analyzeJavaSource(
 
   /*
    * -------------------------------------------------------
-   * 5. MAINTAINABILITY GROUPING
+   * 5. GROUP RELATED FINDINGS
    * -------------------------------------------------------
    */
 
@@ -269,18 +243,23 @@ export function analyzeJavaSource(
 
   /*
    * -------------------------------------------------------
-   * 6. PRIORITY SCORING
+   * 6. PRIORITIZE GROUPS
    * -------------------------------------------------------
-   *
-   * Converts grouped findings into ranked maintainability
-   * concerns using explainable evidence.
    */
 
-  const groups = prioritizeMaintainabilityGroups(rawGroups);
+  const prioritizedGroups = prioritizeMaintainabilityGroups(rawGroups);
 
   /*
    * -------------------------------------------------------
-   * 7. FINAL RESULT
+   * 7. GENERATE ORDERED REFACTORING GUIDANCE
+   * -------------------------------------------------------
+   */
+
+  const groups = addRefactoringGuidance(prioritizedGroups);
+
+  /*
+   * -------------------------------------------------------
+   * 8. FINAL RESULT
    * -------------------------------------------------------
    */
 
