@@ -195,10 +195,22 @@ function buildDuplicationFixes(
 
   const averageSimilarity = calculateAverageSimilarity(group);
 
+  const methodLabel = pluralize(methodCount, "method", "methods");
+
+  const relationshipLabel = pluralize(
+    pairCount,
+    "detected relationship",
+    "detected relationships",
+  );
+
   addStep(
     steps,
     "Compare the repeated implementations",
-    `${methodCount} method(s) participate in this duplication cluster across ${pairCount} detected relationship(s), with approximately ${averageSimilarity}% average structural similarity. Identify which operations are genuinely common and which parts represent intentional variation.`,
+    `${methodCount} ${methodLabel} participate in this duplication cluster across ` +
+      `${pairCount} ${relationshipLabel}, with approximately ` +
+      `${averageSimilarity}% average structural similarity. ` +
+      `Identify which operations are genuinely common and which parts ` +
+      `represent intentional variation.`,
     ["Duplicated Logic"],
   );
 
@@ -236,6 +248,13 @@ function calculateAverageSimilarity(
   return Math.round(total / group.duplicatePairs.length);
 }
 
+/**
+ * Returns a grammatically correct singular or plural label.
+ */
+function pluralize(count: number, singular: string, plural: string): string {
+  return count === 1 ? singular : plural;
+}
+
 function addVerificationStep(
   steps: RefactoringStep[],
   relatedIssueTypes: MaintainabilityIssueType[],
@@ -256,8 +275,11 @@ function addStep(
 ): void {
   steps.push({
     order: steps.length + 1,
+
     title,
+
     reason,
+
     relatedIssueTypes,
   });
 }
