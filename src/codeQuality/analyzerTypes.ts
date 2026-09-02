@@ -52,31 +52,11 @@ export interface DuplicateAnalysis {
   evidence: string;
 }
 
-/**
- * Describes the structural type of a maintainability group.
- *
- * Method:
- * Findings that occur in the same method.
- *
- * Class:
- * Findings that occur at class level.
- *
- * Duplication Cluster:
- * Multiple methods connected through duplicated-logic
- * relationships.
- */
 export type MaintainabilityGroupKind =
   | "Method"
   | "Class"
   | "Duplication Cluster";
 
-/**
- * Represents a consolidated maintainability concern.
- *
- * Raw analyzer findings are grouped before priority scoring
- * so developers receive related concerns rather than a flat
- * list of isolated warnings.
- */
 export interface MaintainabilityGroup {
   id: string;
 
@@ -86,80 +66,46 @@ export interface MaintainabilityGroup {
 
   fileName: string;
 
-  /**
-   * Main human-readable location of the concern.
-   *
-   * Examples:
-   *
-   * updateQueue()
-   * Commander
-   * 3 related methods
-   */
   primaryLocation: string;
 
-  /**
-   * First relevant source line for navigation/display.
-   */
   startLine: number;
 
-  /**
-   * End line is mainly applicable to method/class groups.
-   */
   endLine?: number;
 
-  /**
-   * Methods participating in this concern.
-   *
-   * A normal method group normally contains one method.
-   * A duplication cluster may contain several.
-   */
   affectedMethods: string[];
 
-  /**
-   * Classes participating in this concern.
-   */
   affectedClasses: string[];
 
-  /**
-   * Unique issue categories represented by the group.
-   */
   issueTypes: MaintainabilityIssueType[];
 
-  /**
-   * Original non-duplication issue evidence belonging to
-   * method/class groups.
-   *
-   * Duplication details are stored separately in
-   * duplicatePairs.
-   */
   issues: DetectedIssue[];
 
-  /**
-   * Pairwise duplicated-logic evidence belonging to a
-   * duplication cluster.
-   */
   duplicatePairs: DuplicateAnalysis[];
 
-  /**
-   * Number of raw findings consolidated into this group.
-   *
-   * Example:
-   *
-   * updateQueue()
-   *   Long Method
-   *   High Complexity
-   *
-   * rawFindingCount = 2
-   *
-   * A duplication cluster containing three pair relationships
-   * has rawFindingCount = 3.
-   */
   rawFindingCount: number;
 
-  /**
-   * Explanation of why the findings were grouped.
-   */
   groupingReason: string;
+}
+
+export type MaintainabilityPriorityLevel = "High" | "Medium" | "Low";
+
+/**
+ * A grouped maintainability concern after evidence-based
+ * priority scoring.
+ */
+export interface PrioritizedMaintainabilityGroup extends MaintainabilityGroup {
+  /**
+   * Normalized priority score between 0 and 100.
+   */
+  priorityScore: number;
+
+  priorityLevel: MaintainabilityPriorityLevel;
+
+  /**
+   * Human-readable evidence explaining why this score
+   * was assigned.
+   */
+  priorityReasons: string[];
 }
 
 export interface JavaAnalysisResult {
@@ -172,14 +118,13 @@ export interface JavaAnalysisResult {
   duplicates: DuplicateAnalysis[];
 
   /**
-   * Consolidated maintainability concerns generated from
-   * the raw analyzer findings.
+   * Consolidated and priority-ranked maintainability
+   * concerns.
    */
-  groups: MaintainabilityGroup[];
+  groups: PrioritizedMaintainabilityGroup[];
 
   /**
-   * Number of unique raw maintainability findings before
-   * grouping.
+   * Number of unique raw findings before grouping.
    */
   totalIssues: number;
 }

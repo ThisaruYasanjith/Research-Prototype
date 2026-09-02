@@ -14,39 +14,41 @@ import { analyzeDuplicatedLogic } from "./duplicationAnalyzer";
 
 import { buildMaintainabilityGroups } from "./groupingEngine";
 
+import { prioritizeMaintainabilityGroups } from "./priorityEngine";
+
 /**
- * Prototype thresholds.
+ * Prototype maintainability thresholds.
  *
- * These values are configurable prototype defaults and should
- * not be presented as universally applicable maintainability
- * standards.
+ * These are configurable defaults for the PP1 prototype.
+ * They should not be presented as universally applicable
+ * maintainability standards.
  */
 const LONG_METHOD_THRESHOLD = 40;
+
 const HIGH_COMPLEXITY_THRESHOLD = 10;
 
 const LARGE_CLASS_LINE_THRESHOLD = 200;
+
 const LARGE_CLASS_METHOD_THRESHOLD = 15;
 
 /**
- * Coordinates the current Java maintainability analysis.
- *
- * Pipeline:
+ * Coordinates the Java maintainability analysis pipeline.
  *
  * Java source
  *   ↓
- * Method metrics
+ * Metric extraction
  *   ↓
- * Class metrics
- *   ↓
- * Maintainability issue detection
+ * Issue detection
  *   ↓
  * Naming indicators
  *   ↓
  * Duplicated-logic detection
  *   ↓
- * Related finding grouping
+ * Maintainability grouping
  *   ↓
- * JavaAnalysisResult
+ * Explainable priority scoring
+ *   ↓
+ * Ranked maintainability concerns
  */
 export function analyzeJavaSource(
   sourceCode: string,
@@ -98,10 +100,7 @@ export function analyzeJavaSource(
     }
 
     /*
-     * Poor Naming indicator
-     *
-     * This is deliberately treated as a measurable naming
-     * indicator rather than perfect semantic understanding.
+     * Measurable Poor Naming indicator.
      */
     const namingIndicator = analyzeMethodName(method.methodName);
 
@@ -132,9 +131,6 @@ export function analyzeJavaSource(
 
     /*
      * Large Class
-     *
-     * A class can exceed either the configured physical
-     * source-line threshold or method-count threshold.
      */
     if (classItem.classLength > LARGE_CLASS_LINE_THRESHOLD) {
       issues.push({
@@ -163,7 +159,7 @@ export function analyzeJavaSource(
     }
 
     /*
-     * Poor class naming indicator.
+     * Measurable class naming indicator.
      */
     const namingIndicator = analyzeClassName(classItem.className);
 
@@ -190,11 +186,10 @@ export function analyzeJavaSource(
   const duplicates = analyzeDuplicatedLogic(sourceCode);
 
   /*
-   * A duplication relationship belongs to both participating
-   * methods for local evidence display.
+   * Attach pair evidence to both participating methods for
+   * local display.
    *
-   * However, the relationship itself will only count once in
-   * totalIssues.
+   * The pair itself is still counted only once later.
    */
   for (const duplicate of duplicates) {
     const firstMethod = methods.find(
@@ -240,10 +235,6 @@ export function analyzeJavaSource(
    * -------------------------------------------------------
    * 4. UNIQUE RAW FINDING COUNT
    * -------------------------------------------------------
-   *
-   * Duplicated Logic is attached to both participating
-   * methods for display, but one A ↔ B relationship is still
-   * one unique raw duplication finding.
    */
 
   const totalMethodIssues = methods.reduce(
@@ -267,13 +258,9 @@ export function analyzeJavaSource(
    * -------------------------------------------------------
    * 5. MAINTAINABILITY GROUPING
    * -------------------------------------------------------
-   *
-   * Raw findings are consolidated into related
-   * maintainability concerns before we later introduce
-   * priority scoring.
    */
 
-  const groups = buildMaintainabilityGroups({
+  const rawGroups = buildMaintainabilityGroups({
     fileName,
     methods,
     classes,
@@ -282,7 +269,18 @@ export function analyzeJavaSource(
 
   /*
    * -------------------------------------------------------
-   * 6. FINAL ANALYSIS RESULT
+   * 6. PRIORITY SCORING
+   * -------------------------------------------------------
+   *
+   * Converts grouped findings into ranked maintainability
+   * concerns using explainable evidence.
+   */
+
+  const groups = prioritizeMaintainabilityGroups(rawGroups);
+
+  /*
+   * -------------------------------------------------------
+   * 7. FINAL RESULT
    * -------------------------------------------------------
    */
 

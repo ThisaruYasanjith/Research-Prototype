@@ -905,6 +905,21 @@ export class CodeQualityPanel {
           renderGroup('processApplication');
 
           function renderRealAnalysis(result) {
+            const highPriorityCount =
+              result.groups.filter(
+                group => group.priorityLevel === 'High'
+              ).length;
+
+            const mediumPriorityCount =
+              result.groups.filter(
+                group => group.priorityLevel === 'Medium'
+              ).length;
+
+            const lowPriorityCount =
+              result.groups.filter(
+                group => group.priorityLevel === 'Low'
+              ).length;
+
             realSummary.innerHTML = \`
               <div class="real-result-card">
 
@@ -929,6 +944,18 @@ export class CodeQualityPanel {
                 </div>
 
                 <div class="real-result-line">
+                  High priority groups: \${highPriorityCount}
+                </div>
+
+                <div class="real-result-line">
+                  Medium priority groups: \${mediumPriorityCount}
+                </div>
+
+                <div class="real-result-line">
+                  Low priority groups: \${lowPriorityCount}
+                </div>
+
+                <div class="real-result-line">
                   Total detected issues: \${result.totalIssues}
                 </div>
 
@@ -940,11 +967,11 @@ export class CodeQualityPanel {
                 ? ''
                 : \`
                   <div class="section-title">
-                    Maintainability Groups
+                    Ranked Maintainability Groups
                   </div>
 
                   \${result.groups
-                    .map(group => {
+                    .map((group, index) => {
                       const issueTypes =
                         group.issueTypes.length === 0
                           ? 'None'
@@ -962,19 +989,103 @@ export class CodeQualityPanel {
                           ? 'None'
                           : group.affectedClasses.join(', ');
 
+                      const priorityClass =
+                        group.priorityLevel.toLowerCase();
+
+                      const priorityReasons =
+                        group.priorityReasons.length === 0
+                          ? '<div class="real-result-line">No additional priority evidence.</div>'
+                          : group.priorityReasons
+                              .map(
+                                reason => \`
+                                  <div class="real-issue">
+                                    \${reason}
+                                  </div>
+                                \`
+                              )
+                              .join('');
+
+                      const localEvidence =
+                        group.issues.length === 0
+                          ? ''
+                          : \`
+                            <div class="sub-heading">
+                              Analysis Evidence
+                            </div>
+
+                            \${group.issues
+                              .map(
+                                issue => \`
+                                  <div class="real-issue">
+                                    <strong>\${issue.type}</strong><br>
+                                    \${issue.evidence}
+                                  </div>
+                                \`
+                              )
+                              .join('')}
+                          \`;
+
+                      const duplicateEvidence =
+                        group.duplicatePairs.length === 0
+                          ? ''
+                          : \`
+                            <div class="sub-heading">
+                              Duplication Evidence
+                            </div>
+
+                            \${group.duplicatePairs
+                              .map(
+                                duplicate => \`
+                                  <div class="real-issue">
+                                    <strong>
+                                      \${duplicate.firstMethod}()
+                                      ↔
+                                      \${duplicate.secondMethod}()
+                                    </strong>
+                                    <br>
+                                    Similarity:
+                                    \${duplicate.similarity}%
+                                  </div>
+                                \`
+                              )
+                              .join('')}
+                          \`;
+
                       return \`
                         <div class="real-result-card">
 
-                          <div class="real-result-title">
-                            \${group.title}
+                          <div class="issue-header">
+
+                            <div>
+                              <div class="real-result-title">
+                                #\${index + 1} · \${group.title}
+                              </div>
+
+                              <div class="real-result-line">
+                                \${group.primaryLocation}
+                              </div>
+                            </div>
+
+                            <div
+                              class="priority priority-\${priorityClass}"
+                            >
+                              \${group.priorityLevel.toUpperCase()}
+                            </div>
+
+                          </div>
+
+                          <div class="score-row">
+                            <span>
+                              Maintainability Priority
+                            </span>
+
+                            <span class="score">
+                              \${group.priorityScore} / 100
+                            </span>
                           </div>
 
                           <div class="real-result-line">
                             Kind: \${group.kind}
-                          </div>
-
-                          <div class="real-result-line">
-                            Location: \${group.primaryLocation}
                           </div>
 
                           <div class="real-result-line">
@@ -990,13 +1101,28 @@ export class CodeQualityPanel {
                           </div>
 
                           <div class="real-result-line">
-                            Raw findings grouped: \${group.rawFindingCount}
+                            Raw findings grouped:
+                            \${group.rawFindingCount}
+                          </div>
+
+                          <div class="sub-heading">
+                            Why These Findings Were Grouped
                           </div>
 
                           <div class="real-issue">
-                            <strong>Grouping reason</strong><br>
                             \${group.groupingReason}
                           </div>
+
+                          \${localEvidence}
+
+                          \${duplicateEvidence}
+
+                          <div class="sub-heading">
+                            Why This Group Is
+                            \${group.priorityLevel} Priority
+                          </div>
+
+                          \${priorityReasons}
 
                         </div>
                       \`;
@@ -1028,23 +1154,28 @@ export class CodeQualityPanel {
                     </div>
 
                     <div class="real-result-line">
-                      Lines: \${method.startLine}–\${method.endLine}
+                      Lines:
+                      \${method.startLine}–\${method.endLine}
                     </div>
 
                     <div class="real-result-line">
-                      Method length: \${method.methodLength}
+                      Method length:
+                      \${method.methodLength}
                     </div>
 
                     <div class="real-result-line">
-                      Parameters: \${method.parameterCount}
+                      Parameters:
+                      \${method.parameterCount}
                     </div>
 
                     <div class="real-result-line">
-                      Cyclomatic complexity: \${method.complexity}
+                      Cyclomatic complexity:
+                      \${method.complexity}
                     </div>
 
                     <div class="real-result-line">
-                      Nesting depth: \${method.nestingDepth}
+                      Nesting depth:
+                      \${method.nestingDepth}
                     </div>
 
                     \${issues}
@@ -1078,15 +1209,18 @@ export class CodeQualityPanel {
                     </div>
 
                     <div class="real-result-line">
-                      Class length: \${classItem.classLength}
+                      Class length:
+                      \${classItem.classLength}
                     </div>
 
                     <div class="real-result-line">
-                      Method count: \${classItem.methodCount}
+                      Method count:
+                      \${classItem.methodCount}
                     </div>
 
                     <div class="real-result-line">
-                      Field count: \${classItem.fieldCount}
+                      Field count:
+                      \${classItem.fieldCount}
                     </div>
 
                     \${issues}
@@ -1101,7 +1235,7 @@ export class CodeQualityPanel {
                 ? ''
                 : \`
                   <div class="section-title">
-                    Duplicated Logic Candidates
+                    Raw Duplicated Logic Candidates
                   </div>
 
                   \${result.duplicates
